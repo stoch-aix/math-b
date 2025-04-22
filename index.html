@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Geraden mit korrigierter Steuerung</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #container { position: relative; }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.8);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .input-group { margin: 10px 0; }
+        input { width: 50px; margin: 0 5px; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="controls">
+            <h3>Richtungsvektoren</h3>
+            <div class="input-group">
+                Gerade 1: 
+                <input type="number" id="dx1" value="1" step="0.1">
+                <input type="number" id="dy1" value="0" step="0.1">
+                <input type="number" id="dz1" value="0" step="0.1">
+            </div>
+            <div class="input-group">
+                Gerade 2: 
+                <input type="number" id="dx2" value="0" step="0.1">
+                <input type="number" id="dy2" value="1" step="0.1">
+                <input type="number" id="dz2" value="0" step="0.1">
+            </div>
+            <button onclick="resetCamera()">Kamera zurücksetzen</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let dir1, dir2, arrow1, arrow2, plane;
+        let isDragging = false;
+        let selectedArrow = null;
+        let initialDirection = new THREE.Vector3();
+
+        init();
+        animate();
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            const light = new THREE.PointLight(0xffffff, 1, 100);
+            light.position.set(10, 10, 10);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            // Camera controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            camera.position.set(5, 5, 5);
+            controls.update();
+
+            // Coordinate system
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+
+            // Initial vectors
+            dir1 = new THREE.Vector3(1, 0, 0);
+            dir2 = new THREE.Vector3(0, 1, 0);
+            
+            // Create arrows
+            arrow1 = createArrow(dir1, 0xff0000);
+            arrow2 = createArrow(dir2, 0x0000ff);
+            scene.add(arrow1, arrow2);
+
+            // Event listeners
+            document.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', updateFromInputs);
+            });
+            
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('mouseup', onMouseUp);
+            renderer.domElement.addEventListener('mouseleave', onMouseUp);
+
+            updateGeometry();
+        }
+
+        function createArrow(direction, color) {
+            const shaftLength = 5;
+            const shaftRadius = 0.2;
+            const headLength = 1;
+            const headRadius = 0.4;
+
+            const arrow = new THREE.Group();
+            
+            // Shaft
+            const shaftGeometry = new THREE.CylinderGeometry(
+                shaftRadius, 
+                shaftRadius, 
+                shaftLength, 
+                8
+            );
+            const shaftMaterial = new THREE.MeshPhongMaterial({ color: color });
+            const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
+            shaft.position.y = shaftLength/2;
+
+            // Head
+            const headGeometry = new THREE.ConeGeometry(headRadius, headLength, 8);
+            const headMaterial = new THREE.MeshPhongMaterial({ color: color });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = shaftLength;
+
+            arrow.add(shaft);
+            arrow.add(head);
+            
+            // Align arrow
+            const axis = new THREE.Vector3(0, 1, 0);
+            const target = direction.clone().normalize();
+            arrow.quaternion.setFromUnitVectors(axis, target);
+
+            return arrow;
+        }
+
+        function onMouseDown(event) {
+            event.stopPropagation();
+            
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            // Calculate mouse position
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([arrow1, arrow2]);
+
+            if (intersects.length > 0) {
+                controls.enabled = false;
+                selectedArrow = intersects[0].object;
+                isDragging = true;
+                initialDirection = selectedArrow === arrow1 ? dir1.clone() : dir2.clone();
+            }
+        }
+
+        function onMouseMove(event) {
+            if (!isDragging || !selectedArrow) {
+                controls.enabled = true;
+                return;
+            }
+
+            // Prevent camera movement
+            event.preventDefault();
+            
+            // Calculate movement delta
+            const sensitivity = 0.02;
+            const deltaX = event.movementX * sensitivity;
+            const deltaY = -event.movementY * sensitivity;
+
+            // Calculate new direction
+            const movement = new THREE.Vector3()
+                .addScaledVector(camera.right, deltaX)
+                .addScaledVector(camera.up, deltaY);
+
+            const newDirection = initialDirection.clone().add(movement).normalize();
+            
+            // Update selected vector
+            if (selectedArrow === arrow1) {
+                dir1.copy(newDirection);
+                updateInputFields('dx1', 'dy1', 'dz1', dir1);
+            } else {
+                dir2.copy(newDirection);
+                updateInputFields('dx2', 'dy2', 'dz2', dir2);
+            }
+
+            updateGeometry();
+        }
+
+        function onMouseUp() {
+            controls.enabled = true;
+            isDragging = false;
+            selectedArrow = null;
+        }
+
+        function updateInputFields(dx, dy, dz, vector) {
+            document.getElementById(dx).value = vector.x.toFixed(2);
+            document.getElementById(dy).value = vector.y.toFixed(2);
+            document.getElementById(dz).value = vector.z.toFixed(2);
+        }
+
+        function updateFromInputs() {
+            dir1.set(
+                parseFloat(document.getElementById('dx1').value),
+                parseFloat(document.getElementById('dy1').value),
+                parseFloat(document.getElementById('dz1').value)
+            ).normalize();
+
+            dir2.set(
+                parseFloat(document.getElementById('dx2').value),
+                parseFloat(document.getElementById('dy2').value),
+                parseFloat(document.getElementById('dz2').value)
+            ).normalize();
+
+            updateGeometry();
+        }
+
+        function updateGeometry() {
+            // Update arrow directions
+            arrow1.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir1);
+            arrow2.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir2);
+
+            // Update plane
+            if (plane) scene.remove(plane);
+            
+            const normal = new THREE.Vector3();
+            normal.crossVectors(dir1, dir2);
+            
+            if (normal.length() > 0.001) {
+                plane = new THREE.Mesh(
+                    new THREE.PlaneGeometry(5, 5),
+                    new THREE.MeshPhongMaterial({
+                        color: 0x00ff00,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.5
+                    })
+                );
+                plane.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), normal.normalize());
+                scene.add(plane);
+            }
+        }
+
+        function resetCamera() {
+            controls.reset();
+            camera.position.set(5, 5, 5);
+            controls.update();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', onWindowResize, false);
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
