@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Line-Plane Intersection</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #controls { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label for="speed">Geschwindigkeit:</label>
+        <input type="range" id="speed" min="0.1" max="2" value="1" step="0.1">
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, line, plane;
+        let time = 0;
+        let speed = 1;
+        let normalVector, lineVector;
+
+        init();
+        animate();
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Camera position
+            camera.position.z = 15;
+            camera.position.y = 10;
+            camera.lookAt(0, 0, 0);
+
+            // Lighting
+            const light = new THREE.PointLight(0xffffff, 1, 100);
+            light.position.set(10, 10, 10);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            // Coordinate system
+            scene.add(new THREE.AxesHelper(10));
+
+            // Plane
+            const planeGeometry = new THREE.PlaneGeometry(20, 20);
+            const planeMaterial = new THREE.MeshPhongMaterial({
+                color: 0x0099ff,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.5
+            });
+            plane = new THREE.Mesh(planeGeometry, planeMaterial);
+            plane.rotation.x = Math.PI/2;
+            scene.add(plane);
+
+            // Normal vector arrow
+            normalVector = new THREE.ArrowHelper(
+                new THREE.Vector3(0, 1, 0).normalize(),
+                new THREE.Vector3(0, 0, 0),
+                3, 0xff0000
+            );
+            scene.add(normalVector);
+
+            // Line
+            const lineGeometry = new THREE.BufferGeometry();
+            const points = [
+                new THREE.Vector3(-10, 0, 0),
+                new THREE.Vector3(10, 0, 0)
+            ];
+            lineGeometry.setFromPoints(points);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+            line = new THREE.Line(lineGeometry, lineMaterial);
+            scene.add(line);
+
+            // Line direction vector
+            lineVector = new THREE.ArrowHelper(
+                new THREE.Vector3(1, 0, 0).normalize(),
+                new THREE.Vector3(0, 0, 0),
+                3, 0xffff00
+            );
+            scene.add(lineVector);
+
+            // Speed control
+            document.getElementById('speed').addEventListener('input', (e) => {
+                speed = parseFloat(e.target.value);
+            });
+
+            // Window resize handler
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function updateLinePosition() {
+            // Animate line position and rotation
+            const height = Math.sin(time) * 5;
+            const angle = Math.cos(time) * Math.PI/2;
+
+            line.position.y = height;
+            line.rotation.z = angle;
+
+            // Update direction vector
+            lineVector.setDirection(new THREE.Vector3(
+                Math.cos(angle),
+                Math.sin(angle),
+                0
+            ).normalize());
+            lineVector.position.copy(line.position);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.005 * speed;
+            
+            updateLinePosition();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
