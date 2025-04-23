@@ -1,163 +1,160 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Vector Multiplication</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #f0f0f0;
-        }
-        canvas {
-            border: 2px solid #333;
-            background-color: white;
-        }
-        .container {
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-            gap: 20px;
-        }
-        .calculation {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            max-width: 400px;
-        }
-        h1 {
-            color: #333;
-        }
-        pre {
-            background-color: #eee;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        button {
-            margin-top: 10px;
-            padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
-</head>
-<body>
-    <h1>Matrix Vector Multiplication</h1>
-    <div class="container">
-        <div id="canvas-holder"></div>
-        <div class="calculation">
-            <h2>Calculation</h2>
-            <pre id="matrix-display"></pre>
-            <pre id="vector-display"></pre>
-            <pre id="result-display"></pre>
-            <button onclick="randomize()">Randomize Matrix & Vector</button>
-        </div>
-    </div>
-
-    <script>
-        let matrix = [[2, 1], [1, 3]];
-        let vector = [1, 2];
-        let result;
-
-        function setup() {
-            let canvas = createCanvas(400, 400);
-            canvas.parent('canvas-holder');
-            calculateResult();
-            updateDisplay();
-        }
-
-        function draw() {
-            background(255);
-            translate(width / 2, height / 2);
-            scale(1, -1); // Flip y-axis for standard coordinate system
-
-            // Draw grid
-            stroke(200);
-            strokeWeight(1);
-            for (let x = -width / 2; x <= width / 2; x += 20) {
-                line(x, -height / 2, x, height / 2);
-            }
-            for (let y = -height / 2; y <= height / 2; y += 20) {
-                line(-width / 2, y, width / 2, y);
-            }
-
-            // Draw axes
-            stroke(0);
-            strokeWeight(2);
-            line(-width / 2, 0, width / 2, 0);
-            line(0, -height / 2, 0, height / 2);
-
-            // Draw original vector
-            stroke(0, 0, 255);
-            fill(0, 0, 255);
-            strokeWeight(2);
-            drawVector(vector[0], vector[1], 'v');
-
-            // Draw transformed vector (result)
-            stroke(255, 0, 0);
-            //stroke(200);
-            fill(255, 0, 0);
-            //fill(0,0,255);
-            strokeWeight(3); // Thicker line for visibility
-            drawVector(result[0], result[1], 'Av');
-
-            // Draw basis vectors and their transformations
-            stroke(0, 0, 128);
-            fill(0,0,255);
-            //fill(0, 255, 0);
-            strokeWeight(2);
-            drawVector(matrix[0][0], matrix[0][1], 'a');
-            drawVector(matrix[1][0], matrix[1][1], 'b');
-        }
-
-        function drawVector(x, y, label) {
-            let scale = 50;
-            let px = x * scale;
-            let py = y * scale;
-            line(0, 0, px, py);
-            circle(px, py, 5);
-            scale(1, -1);
-            text(label, px + 10, -py - 10);
-            scale(1, -1);
-        }
-
-        function calculateResult() {
-            result = [
-                matrix[0][0] * vector[0] + matrix[0][1] * vector[1],
-                matrix[1][0] * vector[0] + matrix[1][1] * vector[1]
-            ];
-        }
-
-        function updateDisplay() {
-            document.getElementById('matrix-display').innerText = 
-                `Matrix A:\n[ ${matrix[0][0]}  ${matrix[0][1]} ]\n[ ${matrix[1][0]}  ${matrix[1][1]} ]`;
-            document.getElementById('vector-display').innerText = 
-                `Vector v:\n[ ${vector[0]} ]\n[ ${vector[1]} ]`;
-            document.getElementById('result-display').innerText = 
-                `Result Av:\n[ ${result[0]} ]\n[ ${result[1]} ]\n\nCalculation:\n${matrix[0][0]}*${vector[0]} + ${matrix[0][1]}*${vector[1]} = ${result[0]}\n${matrix[1][0]}*${vector[0]} + ${matrix[1][1]}*${vector[1]} = ${result[1]}`;
-        }
-
-        function randomize() {
-            matrix = [
-                [Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 4 - 2)],
-                [Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 4 - 2)]
-            ];
-            vector = [Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 4 - 2)];
-            calculateResult();
-            updateDisplay();
-        }
-    </script>
-</body>
-</html>
+ <html lang="en">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <title>Matrix Vector Multiplication</title>
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+     <style>
+         body {
+             font-family: Arial, sans-serif;
+             margin: 20px;
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             background-color: #f0f0f0;
+         }
+         canvas {
+             border: 2px solid #333;
+             background-color: white;
+         }
+         .container {
+             display: flex;
+             flex-direction: row;
+             align-items: flex-start;
+             gap: 20px;
+         }
+         .calculation {
+             background-color: #fff;
+             padding: 20px;
+             border-radius: 8px;
+             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+             max-width: 400px;
+         }
+         h1 {
+             color: #333;
+         }
+         pre {
+             background-color: #eee;
+             padding: 10px;
+             border-radius: 4px;
+         }
+         button {
+             margin-top: 10px;
+             padding: 10px 20px;
+             background-color: #007BFF;
+             color: white;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+         }
+         button:hover {
+             background-color: #0056b3;
+         }
+     </style>
+ </head>
+ <body>
+     <h1>Matrix Vector Multiplication</h1>
+     <div class="container">
+         <div id="canvas-holder"></div>
+         <div class="calculation">
+             <h2>Calculation</h2>
+             <pre id="matrix-display"></pre>
+             <pre id="vector-display"></pre>
+             <pre id="result-display"></pre>
+             <button onclick="randomize()">Randomize Matrix & Vector</button>
+         </div>
+     </div>
+ 
+     <script>
+         let matrix = [[2, 1], [1, 3]];
+         let vector = [1, 2];
+         let result;
+ 
+         function setup() {
+             let canvas = createCanvas(400, 400);
+             canvas.parent('canvas-holder');
+             calculateResult();
+             updateDisplay();
+         }
+ 
+         function draw() {
+             background(255);
+             translate(width / 2, height / 2);
+             scale(1, -1); // Flip y-axis for standard coordinate system
+ 
+             // Draw grid
+             stroke(200);
+             strokeWeight(1);
+             for (let x = -width / 2; x <= width / 2; x += 20) {
+                 line(x, -height / 2, x, height / 2);
+             }
+             for (let y = -height / 2; y <= height / 2; y += 20) {
+                 line(-width / 2, y, width / 2, y);
+             }
+ 
+             // Draw axes
+             stroke(0);
+             strokeWeight(2);
+             line(-width / 2, 0, width / 2, 0);
+             line(0, -height / 2, 0, height / 2);
+ 
+             // Draw original vector
+             stroke(0, 0, 255);
+             fill(0, 0, 255);
+             strokeWeight(2);
+             drawVector(vector[0], vector[1], 'v');
+ 
+             // Draw transformed vector (result)
+             stroke(255, 0, 0);
+             fill(255, 0, 0);
+             strokeWeight(3); // Thicker line for visibility
+             drawVector(result[0], result[1], 'Av');
+ 
+             // Draw basis vectors and their transformations
+             stroke(0, 255, 0);
+             fill(0, 255, 0);
+             strokeWeight(2);
+             drawVector(matrix[0][0], matrix[0][1], 'î\'');
+             drawVector(matrix[1][0], matrix[1][1], 'ĵ\'');
+         }
+ 
+         function drawVector(x, y, label) {
+             let scale = 50;
+             let px = x * scale;
+             let py = y * scale;
+             line(0, 0, px, py);
+             circle(px, py, 5);
+             scale(1, -1);
+             text(label, px + 10, -py - 10);
+             scale(1, -1);
+         }
+ 
+         function calculateResult() {
+             result = [
+                 matrix[0][0] * vector[0] + matrix[0][1] * vector[1],
+                 matrix[1][0] * vector[0] + matrix[1][1] * vector[1]
+             ];
+         }
+ 
+         function updateDisplay() {
+             document.getElementById('matrix-display').innerText = 
+                 `Matrix A:\n[ ${matrix[0][0]}  ${matrix[0][1]} ]\n[ ${matrix[1][0]}  ${matrix[1][1]} ]`;
+             document.getElementById('vector-display').innerText = 
+                 `Vector v:\n[ ${vector[0]} ]\n[ ${vector[1]} ]`;
+             document.getElementById('result-display').innerText = 
+                 `Result Av:\n[ ${result[0]} ]\n[ ${result[1]} ]\n\nCalculation:\n${matrix[0][0]}*${vector[0]} + ${matrix[0][1]}*${vector[1]} = ${result[0]}\n${matrix[1][0]}*${vector[0]} + ${matrix[1][1]}*${vector[1]} = ${result[1]}`;
+         }
+ 
+         function randomize() {
+             matrix = [
+                 [Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 4 - 2)],
+                 [Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 4 - 2)]
+             ];
+             vector = [Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 4 - 2)];
+             calculateResult();
+             updateDisplay();
+         }
+     </script>
+ </body>
+ </html>
