@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaussian Elimination Solver</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding: 20px; }
+        table { margin-bottom: 20px; }
+        canvas { border: 1px solid #ccc; margin-top: 20px; }
+        .step { margin-top: 20px; }
+        .error { color: red; }
+        #steps pre { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+        #graphCaption { margin-top: 10px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gaussian Elimination Solver</h1>
+        <div class="mb-3">
+            <label for="size" class="form-label">Number of Equations/Variables:</label>
+            <input type="number" id="size" class="form-control" value="2" min="1" max="10">
+            <button class="btn btn-primary mt-2" onclick="generateMatrix()">Generate Matrix</button>
+        </div>
+        <div id="matrixInput"></div>
+        <button class="btn btn-success mb-3" onclick="solve()">Solve</button>
+        <div id="steps" class="step"></div>
+        <div id="solution" class="step"></div>
+        <canvas id="graph" width="400" height="400" class="d-none"></canvas>
+        <p id="graphCaption"></p>
+    </div>
+
+    <script>
+        let n = 2;
+        let A = [];
+        let b = [];
+
+        function generateMatrix() {
+            n = parseInt(document.getElementById('size').value);
+            if (n < 1 || n > 10) {
+                alert('Please enter a size between 1 and 10.');
+                return;
+            }
+            A = Array(n).fill().map(() => Array(n).fill(0));
+            b = Array(n).fill(0);
+
+            let html = '<h3>Enter Coefficients and RHS</h3><table class="table table-bordered"><tr>';
+            for (let j = 0; j < n; j++) html += `<th>x${j + 1}</th>`;
+            html += '<th>RHS</th></tr>';
+            for (let i = 0; i < n; i++) {
+                html += '<tr>';
+                for (let j = 0; j < n; j++) {
+                    html += `<td><input type="number" class="form-control" id="a_${i}_${j}" value="0" step="any"></td>`;
+                }
+                html += `<td><input type="number" class="form-control" id="b_${i}" value="0" step="any"></td></tr>`;
+            }
+            html += '</table>';
+            document.getElementById('matrixInput').innerHTML = html;
+            document.getElementById('steps').innerHTML = '';
+            document.getElementById('solution').innerHTML = '';
+            document.getElementById('graph').classList.add('d-none');
+            document.getElementById('graphCaption').innerHTML = '';
+        }
+
+        function readMatrix() {
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    A[i][j] = parseFloat(document.getElementById(`a_${i}_${j}`).value) || 0;
+                }
+                b[i] = parseFloat(document.getElementById(`b_${i}`).value) || 0;
+            }
+        }
+
+        function matrixToString(A, b, n) {
+            let str = '';
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    str += A[i][j].toFixed(4).padStart(10) + ' ';
+                }
+                str += '| ' + b[i].toFixed(4).padStart(10) + '\n';
+            }
+            return str;
+        }
+
+        function solve() {
+            readMatrix();
+            document.getElementById('steps').innerHTML = '';
+            document.getElementById('solution').innerHTML = '';
+            document.getElementById('graph').classList.add('d-none');
+            document.getElementById('graphCaption').innerHTML = '';
+
+            let steps = [];
+            let A_copy = A.map(row => [...row]);
+            let b_copy = [...b];
+
+            // Gaussian Elimination with Partial Pivoting
+            let rank = 0;
+            let pivotCols = [];
+            for (let k = 0; k < n; k++) {
+                let max = Math.abs(A_copy[k][k] || 0);
+                let maxRow = k;
+                for (let i = k + 1; i < n; i++) {
+                    if (Math.abs(A_copy[i][k]) > max) {
+                        max = Math.abs(A_copy[i][k]);
+                        maxRow = i;
+                    }
+                }
+                if (max < 1e-10) continue;
+                rank++;
+                pivotCols.push(k);
+
+                if (maxRow !== k) {
+                    [A_copy[k], A_copy[maxRow]] = [A_copy[maxRow], A_copy[k]];
+                    [b_copy[k], b_copy[maxRow]] = [b_copy[maxRow], b_copy[k]];
+                    steps.push(`Step ${k + 1}: Pivot by swapping row ${k + 1} with row ${maxRow + 1}\n${matrixToString(A_copy, b_copy, n)}`);
+                }
+
+                for (let i = k + 1; i < n; i++) {
+                    let factor = A_copy[i][k] / A_copy[k][k];
+                    for (let j = k; j < n; j++) {
+                        A_copy[i][j] -= factor * A_copy[k][j];
+                    }
+                    b_copy[i] -= factor * b_copy[k];
+                    steps.push(`Step ${k + 1}.${i - k}: Eliminate column ${k + 1} in row ${i + 1} using row ${k + 1} (factor = ${factor.toFixed(4)})\n${matrixToString(A_copy, b_copy, n)}`);
+                }
+            }
+
+            // Check for inconsistency
+            for (let i = rank; i < n; i++) {
+                if (Math.abs(b_copy[i]) > 1e-10) {
+                    document.getElementById('solution').innerHTML = '<p class="error">Error: System is inconsistent.</p>';
+                    return;
+                }
+            }
+
+            // Display steps
+            let stepsHtml = '<h3>Steps</h3>';
+            stepsHtml += '<pre>Initial augmented matrix:\n' + matrixToString(A, b, n) + '</pre>';
+            steps.forEach(step => {
+                stepsHtml += '<pre>' + step + '</pre>';
+            });
+            document.getElementById('steps').innerHTML = stepsHtml;
+
+            // Handle solution based on rank
+            if (rank < n) {
+                // Infinitely many solutions
+                let freeVars = n - rank;
+                let solutionHtml = '<h3>Solution</h3><p>System has infinitely many solutions with ' + freeVars + ' free variable(s).</p>';
+                solutionHtml += '<p><b>Parametric Solution:</b><br>';
+
+                let freeVarsIndices = [];
+                for (let j = 0; j < n; j++) {
+                    if (!pivotCols.includes(j)) freeVarsIndices.push(j);
+                }
+
+                let x = Array(n).fill(null);
+                for (let j = 0; j < n; j++) {
+                    if (freeVarsIndices.includes(j)) {
+                        x[j] = `t_${j + 1}`;
+                    }
+                }
+
+                for (let i = rank - 1; i >= 0; i--) {
+                    let pivotCol = pivotCols[i];
+                    let sum = b_copy[i];
+                    let expr = [];
+                    for (let j = pivotCol + 1; j < n; j++) {
+                        if (Math.abs(A_copy[i][j]) > 1e-10 && x[j]) {
+                            let coeff = A_copy[i][j];
+                            sum -= coeff * (x[j].startsWith('t_') ? 0 : parseFloat(x[j]));
+                            expr.push(`${-coeff.toFixed(4)} * ${x[j]}`);
+                        }
+                    }
+                    if (Math.abs(A_copy[i][pivotCol]) > 1e-10) {
+                        let constant = sum / A_copy[i][pivotCol];
+                        x[pivotCol] = constant.toFixed(4);
+                        if (expr.length > 0) {
+                            x[pivotCol] += ' + ' + expr.join(' + ');
+                        }
+                    } else {
+                        x[pivotCol] = '0';
+                    }
+                }
+
+                for (let j = 0; j < n; j++) {
+                    solutionHtml += `x${j + 1} = ${x[j]}<br>`;
+                }
+                solutionHtml += '</p>';
+                document.getElementById('solution').innerHTML = solutionHtml;
+
+                // Plot for 2x2 with infinitely many solutions
+                if (n === 2) {
+                    drawGraph(null, A_copy, b_copy, rank, true);
+                }
+                return;
+            }
+
+            // Unique solution (rank = n)
+            let x = Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = b_copy[i];
+                for (let j = i + 1; j < n; j++) {
+                    x[i] -= A_copy[i][j] * x[j];
+                }
+                x[i] /= A_copy[i][i];
+            }
+
+            let solutionHtml = '<h3>Solution</h3><p>Unique solution:<br>';
+            for (let i = 0; i < n; i++) {
+                solutionHtml += `x${i + 1} = ${x[i].toFixed(4)}<br>`;
+            }
+            solutionHtml += '</p>';
+            document.getElementById('solution').innerHTML = solutionHtml;
+
+            // Plot for 2x2 unique solution
+            if (n === 2) {
+                drawGraph(x, A, b, rank, false);
+            }
+        }
+
+        function drawGraph(x, A_plot, b_plot, rank, isInfinite) {
+            const canvas = document.getElementById('graph');
+            const ctx = canvas.getContext('2d');
+            canvas.classList.remove('d-none');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Graph settings
+            const w = canvas.width, h = canvas.height;
+            const cx = w / 2, cy = h / 2;
+            const maxVal = Math.max(5, ...(x ? x.map(Math.abs) : []), ...b_plot.map(Math.abs), ...A_plot.flat().map(Math.abs));
+            const scale = 200 / maxVal;
+
+            // Draw axes
+            ctx.beginPath();
+            ctx.moveTo(0, cy);
+            ctx.lineTo(w, cy);
+            ctx.moveTo(cx, 0);
+            ctx.lineTo(cx, h);
+            ctx.strokeStyle = 'black';
+            ctx.stroke();
+
+            // Draw grid
+            ctx.strokeStyle = '#ddd';
+            for (let i = -maxVal; i <= maxVal; i += maxVal / 5) {
+                ctx.beginPath();
+                ctx.moveTo(cx + i * scale, 0);
+                ctx.lineTo(cx + i * scale, h);
+                ctx.moveTo(0, cy - i * scale);
+                ctx.lineTo(w, cy - i * scale);
+                ctx.stroke();
+            }
+
+            // Draw lines
+            if (isInfinite) {
+                // Plot single line for infinitely many solutions
+                ctx.beginPath();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+                let a1 = A_plot[0][0], a2 = A_plot[0][1], b_val = b_plot[0];
+                if (Math.abs(a2) > 1e-10) {
+                    let x1 = -maxVal, y1 = (b_val - a1 * x1) / a2;
+                    let x2 = maxVal, y2 = (b_val - a1 * x2) / a2;
+                    ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                    ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                } else if (Math.abs(a1) > 1e-10) {
+                    let x_val = b_val / a1;
+                    ctx.moveTo(cx + x_val * scale, 0);
+                    ctx.lineTo(cx + x_val * scale, h);
+                } else if (Math.abs(b_val) < 1e-10) {
+                    let x1 = -maxVal, y1 = 0;
+                    let x2 = maxVal, y2 = 0;
+                    ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                    ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                }
+                ctx.stroke();
+            } else {
+                // Plot two lines for unique solution
+                const colors = ['blue', 'red'];
+                for (let i = 0; i < 2; i++) {
+                    let a1 = A_plot[i][0], a2 = A_plot[i][1], b_val = b_plot[i];
+                    ctx.beginPath();
+                    ctx.strokeStyle = colors[i];
+                    ctx.lineWidth = 2;
+                    if (Math.abs(a2) > 1e-10) {
+                        let x1 = -maxVal, y1 = (b_val - a1 * x1) / a2;
+                        let x2 = maxVal, y2 = (b_val - a1 * x2) / a2;
+                        ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                        ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                    } else if (Math.abs(a1) > 1e-10) {
+                        let x_val = b_val / a1;
+                        ctx.moveTo(cx + x_val * scale, 0);
+                        ctx.lineTo(cx + x_val * scale, h);
+                    } else if (Math.abs(b_val) < 1e-10) {
+                        let x1 = -maxVal, y1 = 0;
+                        let x2 = maxVal, y2 = 0;
+                        ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                        ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                    }
+                    ctx.stroke();
+                }
+
+                // Draw solution point
+                ctx.beginPath();
+                ctx.arc(cx + x[0] * scale, cy - x[1] * scale, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = 'green';
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+            }
+
+            // Set caption
+            const caption = isInfinite
+                ? 'The plot shows a single line, where every point (x1, x2) on the line represents a solution to the system, indicating infinitely many solutions.'
+                : 'The plot shows two lines intersecting at the green point, which represents the unique solution (x1, x2) to the system.';
+            document.getElementById('graphCaption').innerHTML = caption;
+        }
+    </script>
+</body>
+</html>
