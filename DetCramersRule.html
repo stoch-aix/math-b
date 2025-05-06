@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Determinant and Cramer's Rule</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .matrix-input { display: inline-block; margin: 10px; }
+        .matrix-input input { width: 60px; text-align: center; margin: 2px; }
+        .section { margin-top: 20px; }
+        .step { margin-left: 20px; margin-top: 10px; }
+        button { padding: 10px; margin: 5px; }
+        #output { max-width: 800px; }
+        .math-container { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Matrix Determinant and Cramer's Rule Solver</h1>
+    <div>
+        <label>Matrix Size (n × n): </label>
+        <input type="number" id="matrixSize" min="1" max="5" value="2">
+        <button onclick="generateMatrix()">Generate Matrix</button>
+    </div>
+    <div id="matrixContainer"></div>
+    <div id="vectorContainer" class="section"></div>
+    <button id="calculateBtn" onclick="calculate()" style="display: none;">Calculate</button>
+    <div id="output" class="section"></div>
+
+    <script>
+        function generateMatrix() {
+            const size = parseInt(document.getElementById('matrixSize').value);
+            if (size < 1 || size > 5) {
+                alert('Please enter a size between 1 and 5.');
+                return;
+            }
+
+            let matrixHtml = '<h3>Enter Matrix A (size ' + size + ' × ' + size + '):</h3><div class="matrix-input">';
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    matrixHtml += `<input type="number" id="a${i}${j}" value="0">`;
+                }
+                matrixHtml += '<br>';
+            }
+            matrixHtml += '</div>';
+            document.getElementById('matrixContainer').innerHTML = matrixHtml;
+
+            let vectorHtml = '<h3>Enter Right-Hand Side Vector b (size ' + size + ' × 1):</h3><div class="matrix-input">';
+            for (let i = 0; i < size; i++) {
+                vectorHtml += `<input type="number" id="b${i}" value="0"><br>`;
+            }
+            vectorHtml += '</div>';
+            document.getElementById('vectorContainer').innerHTML = vectorHtml;
+
+            document.getElementById('calculateBtn').style.display = 'block';
+        }
+
+        function getMatrix(size) {
+            let matrix = [];
+            for (let i = 0; i < size; i++) {
+                let row = [];
+                for (let j = 0; j < size; j++) {
+                    let value = parseFloat(document.getElementById(`a${i}${j}`).value);
+                    row.push(isNaN(value) ? 0 : value);
+                }
+                matrix.push(row);
+            }
+            return matrix;
+        }
+
+        function getVector(size) {
+            let vector = [];
+            for (let i = 0; i < size; i++) {
+                let value = parseFloat(document.getElementById(`b${i}`).value);
+                vector.push(isNaN(value) ? 0 : value);
+            }
+            return vector;
+        }
+
+        function matrixToLatex(matrix) {
+            let latex = '\\begin{bmatrix} ';
+            for (let i = 0; i < matrix.length; i++) {
+                latex += matrix[i].map(x => x.toString()).join(' & ');
+                if (i < matrix.length - 1) latex += ' \\\\ ';
+            }
+            latex += ' \\end{bmatrix}';
+            return latex;
+        }
+
+        function vectorToLatex(vector) {
+            let latex = '\\begin{bmatrix} ';
+            latex += vector.map(x => x.toString()).join(' \\\\ ');
+            latex += ' \\end{bmatrix}';
+            return latex;
+        }
+
+        function getMinorMatrix(matrix, row, col) {
+            return matrix
+                .filter((_, i) => i !== row)
+                .map(row => row.filter((_, j) => j !== col));
+        }
+
+        function determinant(matrix, steps = [], level = 0) {
+            const prefix = level > 0 ? `<div class="step">` : '';
+            const suffix = level > 0 ? `</div>` : '';
+
+            if (matrix.length === 1) {
+                steps.push(`${prefix}\\(${matrix[0][0]}\\)${suffix}`);
+                return matrix[0][0];
+            }
+            if (matrix.length === 2) {
+                let det = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+                steps.push(`${prefix}\\(${matrix[0][0]} \\cdot ${matrix[1][1]} - ${matrix[0][1]} \\cdot ${matrix[1][0]} = ${det}\\)${suffix}`);
+                return det;
+            }
+
+            let det = 0;
+            let symbolicTerms = [];
+            let matrixTerms = [];
+            let valueTerms = [];
+
+            // Step 1: Write the expansion formula
+            steps.push(`${prefix}<b>Expanding along first row:</b> \\(\\det A = \\sum_{j=1}^{${matrix.length}} a_{1,j} (-1)^{1+j} \\det M_{1,j}\\)${suffix}`);
+
+            // Step 2: Compute each minor and store terms
+            for (let j = 0; j < matrix.length; j++) {
+                let sign = ((-1) ** (1 + j + 1));
+                let minorMatrix = getMinorMatrix(matrix, 0, j);
+                let minorSteps = [];
+                let minorDet = determinant(minorMatrix, minorSteps, level + 1);
+                let termValue = matrix[0][j] * sign * minorDet;
+                det += termValue;
+
+                let minorMatrixLatex = matrixToLatex(minorMatrix);
+                symbolicTerms.push(`${matrix[0][j]} \\cdot (-1)^{1+${j+1}} \\det M_{1,${j+1}}`);
+                matrixTerms.push(`${matrix[0][j]} \\cdot (${sign === 1 ? '1' : '-1'}) \\cdot ${minorMatrixLatex}`);
+                valueTerms.push(`${matrix[0][j]} \\cdot (${sign === 1 ? '1' : '-1'}) \\cdot ${minorDet} = ${termValue}`);
+
+                steps.push(`${prefix}<b>Minor \\(M_{1,${j+1}}\\):</b> \\(${minorMatrixLatex}\\)${suffix}`);
+                steps.push(...minorSteps);
+            }
+
+            // Step 3: Show the symbolic expansion
+            steps.push(`${prefix}<b>Expansion:</b> \\(\\det A = ${symbolicTerms.join(' + ')}\\)${suffix}`);
+
+            // Step 4: Substitute minor matrices
+            steps.push(`${prefix}<b>Substitute minor matrices:</b> \\(\\det A = ${matrixTerms.join(' + ')}\\)${suffix}`);
+
+            // Step 5: Substitute minor values and compute
+            steps.push(`${prefix}<b>Substitute minor values:</b> \\(\\det A = ${valueTerms.join(' + ')} = ${det}\\)${suffix}`);
+
+            return det;
+        }
+
+        function replaceColumn(matrix, vector, col) {
+            let newMatrix = matrix.map(row => [...row]);
+            for (let i = 0; i < matrix.length; i++) {
+                newMatrix[i][col] = vector[i];
+            }
+            return newMatrix;
+        }
+
+        function calculate() {
+            const size = parseInt(document.getElementById('matrixSize').value);
+            const A = getMatrix(size);
+            const b = getVector(size);
+
+            let output = '<h2>Results</h2>';
+
+            output += '<h3>Input System: \\(Ax = b\\)</h3>';
+            output += `<div class="math-container">\\( A = ${matrixToLatex(A)} \\), \\( b = ${vectorToLatex(b)} \\)</div>`;
+
+            output += '<h3>Determinant of A (Expansion along first row)</h3>';
+            let detSteps = [];
+            let detA = determinant(A, detSteps);
+            output += detSteps.join('<br>');
+            output += `<br><div class="math-container"><b>Determinant of A:</b> \\(\\det A = ${detA}\\)</div>`;
+
+            output += '<h3>Solving \\(Ax = b\\) using Cramer\'s Rule</h3>';
+            if (detA === 0) {
+                output += '<p>Determinant is zero, system may have no unique solution.</p>';
+            } else {
+                let solutions = [];
+                for (let j = 0; j < size; j++) {
+                    let Aj = replaceColumn(A, b, j);
+                    let detStepsAj = [];
+                    let detAj = determinant(Aj, detStepsAj);
+                    output += `<h4>Determinant of \\(A_${j+1}\\) (replace column ${j+1} with \\(b\\))</h4>`;
+                    output += `<div class="math-container">\\( A_${j+1} = ${matrixToLatex(Aj)} \\)</div>`;
+                    output += detStepsAj.join('<br>');
+                    output += `<br><div class="math-container"><b>Determinant of \\(A_${j+1}\\):</b> \\(\\det A_${j+1} = ${detAj}\\)</div>`;
+                    let xj = detAj / detA;
+                    solutions.push(`x_${j+1} = \\frac{\\det A_${j+1}}{\\det A} = \\frac{${detAj}}{${detA}} = ${xj.toFixed(4)}`);
+                }
+                output += '<h4>Solutions</h4>';
+                output += solutions.map(s => `<div class="math-container">\\(${s}\\)</div>`).join('');
+            }
+
+            document.getElementById('output').innerHTML = output;
+            setTimeout(() => {
+                MathJax.typesetPromise().catch(err => console.error('MathJax typesetting error:', err));
+            }, 100);
+        }
+    </script>
+</body>
+</html>
