@@ -1,0 +1,272 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Function Plotter</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.0.0/math.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Include MathJax for LaTeX rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        #plot {
+            width: 100%;
+            height: 600px;
+        }
+        select, input, button {
+            padding: 5px;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .range-container {
+            margin: 10px 0;
+        }
+        label {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h2>3D Function Plotter</h2>
+    <div>
+        <label for="functionSelect">Select a function:</label>
+        <select id="functionSelect" onchange="setFunction()">
+            <option value="sin(sqrt(x^2 + y^2))">sin(sqrt(x² + y²))</option>
+            <option value="cos(x) * sin(y)">cos(x) * sin(y)</option>
+            <option value="x^2 - y^2">x² - y²</option>
+            <option value="sin(x) + cos(y)">sin(x) + cos(y)</option>
+            <option value="custom">Custom Function</option>
+        </select>
+    </div>
+    <div id="customFunctionDiv" style="display: none;">
+        <label for="customFunction">Enter function f(x, y):</label>
+        <input type="text" id="customFunction" placeholder="e.g., sin(x) + cos(y)">
+        <button onclick="updatePlot()">Apply Custom Function</button>
+    </div>
+    <div class="range-container">
+        <label for="xMin">X Range:</label>
+        <input type="number" id="xMin" value="-10" step="0.1" oninput="updatePlot()"> to
+        <input type="number" id="xMax" value="10" step="0.1" oninput="updatePlot()">
+    </div>
+    <div class="range-container">
+        <label for="yMin">Y Range:</label>
+        <input type="number" id="yMin" value="-10" step="0.1" oninput="updatePlot()"> to
+        <input type="number" id="yMax" value="10" step="0.1" oninput="updatePlot()">
+    </div>
+    <div class="range-container">
+        <label for="zScale">Z-Axis Range: ±</label>
+        <input type="range" id="zScale" min="1" max="20" value="5" oninput="updatePlot()">
+        <span id="zScaleValue">5</span>
+    </div>
+    <div>
+        <label for="exportFormat">Export Format:</label>
+        <select id="exportFormat">
+            <option value="png">PNG</option>
+            <option value="jpg">JPG</option>
+            <option value="pdf">PDF</option>
+        </select>
+        <button onclick="exportPlot()">Export Plot</button>
+    </div>
+    <div id="plot"></div>
+
+    <script>
+        // Show/hide custom function input
+        function setFunction() {
+            const funcSelect = document.getElementById('functionSelect').value;
+            const customDiv = document.getElementById('customFunctionDiv');
+            customDiv.style.display = funcSelect === 'custom' ? 'block' : 'none';
+            updatePlot();
+        }
+
+        // Generate data for plotting
+        function generateData(funcStr, xMin, xMax, yMin, yMax) {
+            const size = 50; // Grid size
+            const x = [], y = [], z = [];
+
+            for (let i = 0; i < size; i++) {
+                x[i] = xMin + (xMax - xMin) * i / (size - 1);
+                y[i] = yMin + (yMax - yMin) * i / (size - 1);
+                z[i] = [];
+                for (let j = 0; j < size; j++) {
+                    try {
+                        const scope = { x: x[i], y: y[j] };
+                        z[i][j] = math.evaluate(funcStr, scope);
+                    } catch (e) {
+                        z[i][j] = NaN; // Handle invalid evaluations
+                    }
+                }
+            }
+
+            return { x, y, z };
+        }
+
+        // Convert math functions to LaTeX commands with proper argument bracing
+        function toLatexFunction(funcStr) {
+            let latexStr = funcStr;
+            const replacements = {
+                'sin': '\\sin',
+                'cos': '\\cos',
+                'tan': '\\tan',
+                'sqrt': '\\sqrt',
+                'log': '\\log',
+                'exp': '\\exp',
+                'asin': '\\arcsin',
+                'acos': '\\arccos',
+                'atan': '\\arctan'
+            };
+
+            // First, replace function names with LaTeX commands
+            for (const [key, value] of Object.entries(replacements)) {
+                const regex = new RegExp(`\\b${key}\\b`, 'g');
+                latexStr = latexStr.replace(regex, value);
+            }
+
+            // Add curly braces around arguments for functions except sqrt
+            const functionsExceptSqrt = Object.values(replacements).filter(val => val !== '\\sqrt');
+            for (const value of functionsExceptSqrt) {
+                const regex = new RegExp(`(${value})\\(([^)]+)\\)`, 'g');
+                latexStr = latexStr.replace(regex, `$1{$2}`);
+            }
+
+            // Specifically handle sqrt to ensure curly braces for its argument
+            const sqrtRegex = /\\sqrt\(([^)]+)\)/g;
+            latexStr = latexStr.replace(sqrtRegex, '\\sqrt{$1}');
+
+            return latexStr;
+        }
+
+        // Plot the 3D surface
+        function plotFunction(funcStr, xMin, xMax, yMin, yMax, zRange) {
+            const data = generateData(funcStr, xMin, xMax, yMin, yMax);
+            const plotData = [{
+                x: data.x,
+                y: data.y,
+                z: data.z,
+                type: 'surface',
+                colorscale: 'Viridis',
+                showscale: true
+            }];
+
+            const latexFuncStr = toLatexFunction(funcStr);
+            const layout = {
+                title: {
+                    text: `$f(x, y) = ${latexFuncStr}$`, // Use LaTeX with proper math commands
+                    x: 0.5,
+                    xanchor: 'center'
+                },
+                autosize: true,
+                margin: { l: 65, r: 50, b: 65, t: 90 },
+                scene: {
+                    xaxis: { title: 'X', range: [xMin, xMax] },
+                    yaxis: { title: 'Y', range: [yMin, yMax] },
+                    zaxis: { title: 'Z', range: [-zRange, zRange] },
+                    camera: {
+                        eye: { x: 0, y: -2, z: 0.5 },
+                        center: { x: 0, y: 0, z: 0 },
+                        up: { x: 0, y: 0, z: 1 }
+                    }
+                }
+            };
+
+            Plotly.newPlot('plot', plotData, layout, { responsive: true });
+        }
+
+        // Update plot
+        function updatePlot() {
+            const funcSelect = document.getElementById('functionSelect').value;
+            const funcStr = funcSelect === 'custom' ?
+                document.getElementById('customFunction').value || '0' :
+                funcSelect;
+            const xMin = parseFloat(document.getElementById('xMin').value) || -10;
+            const xMax = parseFloat(document.getElementById('xMax').value) || 10;
+            const yMin = parseFloat(document.getElementById('yMin').value) || -10;
+            const yMax = parseFloat(document.getElementById('yMax').value) || 10;
+            const zRange = parseFloat(document.getElementById('zScale').value);
+
+            // Update Z-axis range display
+            document.getElementById('zScaleValue').textContent = zRange;
+
+            // Validate ranges
+            if (xMin >= xMax || yMin >= yMax) {
+                alert('Invalid range: Minimum must be less than maximum for X and Y axes.');
+                return;
+            }
+
+            try {
+                plotFunction(funcStr, xMin, xMax, yMin, yMax, zRange);
+            } catch (e) {
+                alert('Invalid function. Please use valid mathematical expressions (e.g., sin(x) + cos(y)).');
+            }
+        }
+
+        // Export plot
+        function exportPlot() {
+            const format = document.getElementById('exportFormat').value;
+            const plotDiv = document.getElementById('plot');
+
+            if (format === 'png') {
+                Plotly.downloadImage(plotDiv, {
+                    format: 'png',
+                    filename: 'plot',
+                    width: 800,
+                    height: 600
+                }).catch(err => {
+                    alert('Error exporting image: ' + err);
+                });
+            } else if (format === 'jpg') {
+                Plotly.toImage(plotDiv, {
+                    format: 'png',
+                    width: 800,
+                    height: 600
+                }).then(imageData => {
+                    const img = new Image();
+                    img.src = imageData;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 800;
+                        canvas.height = 600;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#fff'; // White background for JPG
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        const jpgData = canvas.toDataURL('image/jpeg', 0.8);
+                        const link = document.createElement('a');
+                        link.href = jpgData;
+                        link.download = 'plot.jpg';
+                        link.click();
+                    };
+                }).catch(err => {
+                    alert('Error exporting JPG: ' + err);
+                });
+            } else if (format === 'pdf') {
+                Plotly.toImage(plotDiv, {
+                    format: 'png',
+                    width: 800,
+                    height: 600
+                }).then(imageData => {
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF();
+                    const imgProps = pdf.getImageProperties(imageData);
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    pdf.addImage(imageData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    pdf.save('plot.pdf');
+                }).catch(err => {
+                    alert('Error exporting PDF: ' + err);
+                });
+            }
+        }
+
+        // Initial plot
+        updatePlot();
+    </script>
+</body>
+</html>
+
