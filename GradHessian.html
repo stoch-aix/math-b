@@ -1,0 +1,177 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbolic Differentiation, Gradient, and Hessian</title>
+    <!-- Load MathJax for rendering LaTeX -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <!-- Load math.js for symbolic computation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.0.0/math.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .input-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        input[type="text"] {
+            padding: 8px;
+            width: 200px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        .step {
+            margin-bottom: 20px;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .matrix {
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <h1>Symbolic Differentiation, Gradient, and Hessian</h1>
+    <div class="input-section">
+        <label for="functionInput">Function (e.g., x^2 + y^2):</label>
+        <input type="text" id="functionInput" placeholder="Enter function">
+        <label for="variableInput">Differentiate with respect to (optional):</label>
+        <input type="text" id="variableInput" placeholder="e.g., x">
+        <label for="variablesInput">All variables (comma-separated, e.g., x,y):</label>
+        <input type="text" id="variablesInput" placeholder="e.g., x,y">
+        <button onclick="compute()">Compute</button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        // Configure MathJax
+        MathJax.typeset();
+
+        function compute() {
+            const funcInput = document.getElementById('functionInput').value.trim();
+            const varInput = document.getElementById('variableInput').value.trim();
+            const varsInput = document.getElementById('variablesInput').value.trim();
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = '';
+
+            // Input validation
+            if (!funcInput || !varsInput) {
+                outputDiv.innerHTML = '<p class="error">Please enter a function and the list of variables.</p>';
+                return;
+            }
+
+            // Parse variables
+            const variables = varsInput.split(',').map(v => v.trim()).filter(v => v);
+            if (variables.length === 0) {
+                outputDiv.innerHTML = '<p class="error">Please provide at least one variable.</p>';
+                return;
+            }
+
+            try {
+                // Parse the function
+                const node = math.parse(funcInput);
+                const steps = [];
+
+                // Step 1: Display the original function
+                steps.push({
+                    description: `We start with the function:`,
+                    expression: `f(${variables.join(', ')}) = ${node.toTex()}`
+                });
+
+                // Step 2: Partial derivative (if variable is specified)
+                if (varInput) {
+                    const derivative = math.derivative(node, varInput);
+                    steps.push({
+                        description: `Differentiating with respect to ${varInput}:`,
+                        expression: `\\frac{\\partial f}{\\partial ${varInput}} = ${derivative.toTex()}`
+                    });
+                    const simplified = math.simplify(derivative);
+                    steps.push({
+                        description: `Simplified partial derivative with respect to ${varInput}:`,
+                        expression: `${simplified.toTex()}`
+                    });
+                }
+
+                // Step 3: Compute the gradient
+                const gradient = variables.map(v => {
+                    const deriv = math.simplify(math.derivative(node, v));
+                    return `\\frac{\\partial f}{\\partial ${v}} = ${deriv.toTex()}`;
+                });
+                const gradientTex = `\\nabla f = \\begin{pmatrix} ${gradient.map(g => g.split('=')[1].trim()).join(' \\\\ ')} \\end{pmatrix}`;
+                steps.push({
+                    description: `The gradient vector, with partial derivatives with respect to ${variables.join(', ')}:`,
+                    expression: gradientTex
+                });
+
+                // Step 4: Compute the Hessian matrix
+                const hessian = variables.map(v1 => {
+                    return variables.map(v2 => {
+                        const firstDeriv = math.derivative(node, v1);
+                        const secondDeriv = math.simplify(math.derivative(firstDeriv, v2));
+                        return secondDeriv.toTex();
+                    });
+                });
+                const hessianTex = `H = \\begin{pmatrix} ${hessian.map(row => row.join(' & ')).join(' \\\\ ')} \\end{pmatrix}`;
+                steps.push({
+                    description: `The Hessian matrix, containing all second-order partial derivatives:`,
+                    expression: hessianTex
+                });
+
+                // Render steps
+                steps.forEach((step, index) => {
+                    const stepDiv = document.createElement('div');
+                    stepDiv.className = 'step';
+                    stepDiv.innerHTML = `<strong>Step ${index + 1}:</strong> ${step.description}<br>\\[ ${step.expression} \\]`;
+                    outputDiv.appendChild(stepDiv);
+                });
+
+                // Trigger MathJax to render the new content
+                MathJax.typesetPromise();
+            } catch (error) {
+                outputDiv.innerHTML = `<p class="error">Error: ${error.message}. Please check your input (e.g., use '*' for multiplication, valid variables).</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
