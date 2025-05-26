@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Neighborhood Animation</title>
+    <style>
+        body { margin: 0; background: white; }
+        canvas { display: block; }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #000;
+            font-family: Arial, sans-serif;
+        }
+        #controls button {
+            margin: 5px;
+            padding: 10px;
+            font-size: 14px;
+        }
+        #controls label {
+            display: block;
+            margin: 5px 0;
+        }
+        #infoText {
+            position: absolute;
+            top: 200px;
+            left: 10px;
+            color: black;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="stage1Button">Start 1D Animation</button>
+        <button id="stage2Button">Start 2D Animation</button>
+        <button id="stage3Button">Start 3D Animation</button>
+        <button id="saveButton">Save as PNG</button>
+        <label>x₀: <input type="range" id="x0Slider" min="-2" max="2" step="0.1" value="0"></label>
+        <label>y₀: <input type="range" id="y0Slider" min="-2" max="2" step="0.1" value="0"></label>
+        <label>a: <input type="range" id="aSlider" min="0.1" max="2" step="0.1" value="1"></label>
+        <label>b: <input type="range" id="bSlider" min="0.1" max="2" step="0.1" value="1"></label>
+    </div>
+    <div id="infoText">Stage: Initial Setup</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Set up the scene, camera, and renderer
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff); // White
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 50);
+        camera.position.set(0, 0, 5);
+        camera.lookAt(0, 0, 0);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Parameters
+        let x0 = 0, y0 = 0, a = 1, b = 1;
+        const defaultA = 1, defaultB = 1, minA = 0.1, minB = 0.1;
+        let stage = 0; // 0: Initial, 1: 1D, 2: 2D, 3: 3D
+        let shrinking = false;
+        const infoText = document.getElementById('infoText');
+
+        // Sliders
+        const x0Slider = document.getElementById('x0Slider');
+        const y0Slider = document.getElementById('y0Slider');
+        const aSlider = document.getElementById('aSlider');
+        const bSlider = document.getElementById('bSlider');
+
+        x0Slider.addEventListener('input', () => {
+            x0 = parseFloat(x0Slider.value);
+            updateScene();
+        });
+
+        y0Slider.addEventListener('input', () => {
+            y0 = parseFloat(y0Slider.value);
+            updateScene();
+        });
+
+        aSlider.addEventListener('input', () => {
+            if (!shrinking) {
+                a = parseFloat(aSlider.value);
+                updateScene();
+            }
+        });
+
+        bSlider.addEventListener('input', () => {
+            if (!shrinking) {
+                b = parseFloat(bSlider.value);
+                updateScene();
+            }
+        });
+
+        // Custom axes
+        let axesGroup;
+        function createAxes() {
+            if (axesGroup) scene.remove(axesGroup);
+            axesGroup = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const tickMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+
+            // X-axis (left to right, Three.js x)
+            axesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-3, 0, 0), new THREE.Vector3(3, 0, 0)
+            ]), material));
+
+            // Y-axis
+            if (stage === 3) {
+                // Y-axis: front to back (Three.js z)
+                axesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(0, 0, -3), new THREE.Vector3(0, 0, 3)
+                ]), material));
+            } else {
+                // Y-axis: bottom to top for 1D/2D (Three.js y)
+                axesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(0, -3, 0), new THREE.Vector3(0, 3, 0)
+                ]), material));
+            }
+
+            // Z-axis (bottom to top, Three.js y, only for 3D)
+            const zAxis = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(x0, -3, y0), new THREE.Vector3(x0, 3, y0)
+            ]), material);
+            zAxis.visible = (stage === 3);
+            axesGroup.add(zAxis);
+
+            // Ticks
+            const tickLength = 0.1;
+            for (let i = -3; i <= 3; i += 0.5) {
+                if (i !== 0) {
+                    // X-axis ticks
+                    axesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(i, stage === 3 ? 0 : -tickLength / 2, stage === 3 ? y0 - tickLength / 2 : 0),
+                        new THREE.Vector3(i, stage === 3 ? 0 : tickLength / 2, stage === 3 ? y0 + tickLength / 2 : 0)
+                    ]), tickMaterial));
+
+                    // Y-axis ticks
+                    if (stage === 3) {
+                        axesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(-tickLength / 2, 0, i), new THREE.Vector3(tickLength / 2, 0, i)
+                        ]), tickMaterial));
+                    } else {
+                        axesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(-tickLength / 2, i, 0), new THREE.Vector3(tickLength / 2, i, 0)
+                        ]), tickMaterial));
+                    }
+
+                    // Z-axis ticks
+                    const zTick = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(x0 - tickLength / 2, i, y0), new THREE.Vector3(x0 + tickLength / 2, i, y0)
+                    ]), tickMaterial);
+                    zTick.visible = (stage === 3);
+                    axesGroup.add(zTick);
+                }
+            }
+
+            // Axis labels
+            function createLabel(text, position) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 64;
+                const context = canvas.getContext('2d');
+                context.font = '20px Arial';
+                context.fillStyle = 'black';
+                context.fillText(text, 10, 30);
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.position.copy(position);
+                sprite.scale.set(0.5, 0.25, 1);
+                return sprite;
+            }
+
+            axesGroup.add(createLabel('X', new THREE.Vector3(3.2, 0, stage === 3 ? y0 : 0)));
+            axesGroup.add(createLabel('Y', stage === 3 ? new THREE.Vector3(0, 0, 3.2) : new THREE.Vector3(0, 3.2, 0)));
+            const zLabel = createLabel('Z', new THREE.Vector3(x0, 3.2, y0));
+            zLabel.visible = (stage === 3);
+            axesGroup.add(zLabel);
+
+            scene.add(axesGroup);
+        }
+
+        // Materials
+        const intervalBoxMaterial = new THREE.MeshBasicMaterial({ color: 0xadd8e6, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }); // Light blue
+        const intervalLineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 }); // Red
+        const pointMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff }); // Blue
+        const rectMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }); // Green
+        const rectLineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 }); // Black
+        const surfaceMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }); // Yellow
+        const mappedRectMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }); // Magenta
+
+        // Center point
+        let centerPoint, pointLabel;
+        function createCenterPoint() {
+            if (centerPoint) scene.remove(centerPoint);
+            if (pointLabel) scene.remove(pointLabel);
+
+            const pointGeometry = new THREE.SphereGeometry(0.05, 32, 32);
+            centerPoint = new THREE.Mesh(pointGeometry, pointMaterial);
+            centerPoint.position.set(x0, stage === 3 ? 0 : y0, stage === 3 ? y0 : 0);
+            scene.add(centerPoint);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 64;
+            const context = canvas.getContext('2d');
+            context.font = '20px Arial';
+            context.fillStyle = 'black';
+            context.fillText('(x₀, y₀)', 10, 30);
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            pointLabel = new THREE.Sprite(spriteMaterial);
+            pointLabel.position.set(x0 + 0.3, (stage === 3 ? 0 : y0) + 0.3, stage === 3 ? y0 : 0);
+            pointLabel.scale.set(0.5, 0.25, 1);
+            scene.add(pointLabel);
+        }
+
+        // 1D interval
+        let intervalLine, intervalBox, leftLabel, rightLabel;
+        function createInterval() {
+            if (intervalLine) scene.remove(intervalLine);
+            if (intervalBox) scene.remove(intervalBox);
+            if (leftLabel) scene.remove(leftLabel);
+            if (rightLabel) scene.remove(rightLabel);
+
+            const points = [new THREE.Vector3(x0 - a, 0, 0), new THREE.Vector3(x0 + a, 0, 0)];
+            intervalLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), intervalLineMaterial);
+            scene.add(intervalLine);
+
+            const boxGeometry = new THREE.PlaneGeometry(2 * a, 0.2);
+            intervalBox = new THREE.Mesh(boxGeometry, intervalBoxMaterial);
+            intervalBox.position.set(x0, 0, 0);
+            scene.add(intervalBox);
+
+            function createEndpointLabel(text, position) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 64;
+                const context = canvas.getContext('2d');
+                context.font = '20px Arial';
+                context.fillStyle = 'black';
+                context.fillText(text, 10, 30);
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.position.copy(position);
+                sprite.scale.set(0.5, 0.25, 1);
+                return sprite;
+            }
+
+            leftLabel = createEndpointLabel('x₀ - a', new THREE.Vector3(x0 - a, 0.2, 0));
+            rightLabel = createEndpointLabel('x₀ + a', new THREE.Vector3(x0 + a, 0.2, 0));
+            scene.add(leftLabel, rightLabel);
+        }
+
+        // 2D rectangle
+        let rectangle, rectLines, rectLabels = [];
+        function createRectangle() {
+            if (rectangle) scene.remove(rectangle);
+            if (rectLines) scene.remove(rectLines);
+            rectLabels.forEach(label => scene.remove(label));
+            rectLabels = [];
+
+            const geometry = new THREE.PlaneGeometry(2 * a, 2 * b);
+            rectangle = new THREE.Mesh(geometry, rectMaterial);
+            rectangle.position.set(x0, y0, 0);
+            scene.add(rectangle);
+
+            const points = [
+                new THREE.Vector3(x0 - a, y0 - b, 0),
+                new THREE.Vector3(x0 + a, y0 - b, 0),
+                new THREE.Vector3(x0 + a, y0 + b, 0),
+                new THREE.Vector3(x0 - a, y0 + b, 0),
+                new THREE.Vector3(x0 - a, y0 - b, 0)
+            ];
+            rectLines = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points), rectLineMaterial);
+            scene.add(rectLines);
+
+            const corners = [
+                { text: '(x₀ - a, y₀ - b)', pos: new THREE.Vector3(x0 - a, y0 - b, 0) },
+                { text: '(x₀ + a, y₀ - b)', pos: new THREE.Vector3(x0 + a, y0 - b, 0) },
+                { text: '(x₀ - a, y₀ + b)', pos: new THREE.Vector3(x0 - a, y0 + b, 0) },
+                { text: '(x₀ + a, y₀ + b)', pos: new THREE.Vector3(x0 + a, y0 + b, 0) }
+            ];
+
+            corners.forEach(corner => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 64;
+                const context = canvas.getContext('2d');
+                context.font = '20px Arial';
+                context.fillStyle = 'black';
+                context.fillText(corner.text, 10, 30);
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.position.copy(corner.pos).add(new THREE.Vector3(0.3, 0.3, 0));
+                sprite.scale.set(0.5, 0.25, 1);
+                rectLabels.push(sprite);
+                scene.add(sprite);
+            });
+        }
+
+        // 3D plot
+        let surface, baseRect, mappedRect;
+        function f(x, y) {
+            return (x - x0) ** 2 + (y - y0) ** 2;
+        }
+
+        function create3DPlot() {
+            if (surface) scene.remove(surface);
+            if (baseRect) scene.remove(baseRect);
+            if (mappedRect) scene.remove(mappedRect);
+
+            // Surface: z = f(x, y)
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            const indices = [];
+            const size = 4;
+            const segments = 50;
+            const xStep = size / segments;
+            const yStep = size / segments;
+
+            for (let i = 0; i <= segments; i++) {
+                const y = -size / 2 + i * yStep; // Mathematical y (Three.js z)
+                for (let j = 0; j <= segments; j++) {
+                    const x = -size / 2 + j * xStep; // Mathematical x (Three.js x)
+                    vertices.push(x, f(x, y), y);
+                }
+            }
+
+            for (let i = 0; i < segments; i++) {
+                for (let j = 0; j < segments; j++) {
+                    const a = i * (segments + 1) + j;
+                    const b = a + 1;
+                    const c = (i + 1) * (segments + 1) + j;
+                    const d = c + 1;
+                    indices.push(a, c, b);
+                    indices.push(b, c, d);
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+            surface = new THREE.Mesh(geometry, surfaceMaterial);
+            scene.add(surface);
+
+            // Base rectangle at z = 0 (xy-plane)
+            const baseGeometry = new THREE.PlaneGeometry(2 * a, 2 * b);
+            baseRect = new THREE.Mesh(baseGeometry, rectMaterial);
+            baseRect.position.set(x0, 0, y0);
+            baseRect.rotation.x = -Math.PI / 2;
+            scene.add(baseRect);
+
+            // Mapped rectangle on surface
+            const mappedGeometry = new THREE.BufferGeometry();
+            const mappedVertices = [];
+            const mappedIndices = [];
+            const mappedSegments = 20;
+            const mappedXStep = (2 * a) / mappedSegments;
+            const mappedYStep = (2 * b) / mappedSegments;
+
+            for (let i = 0; i <= mappedSegments; i++) {
+                const y = y0 - b + i * mappedYStep;
+                for (let j = 0; j <= mappedSegments; j++) {
+                    const x = x0 - a + j * mappedXStep;
+                    mappedVertices.push(x, f(x, y), y);
+                }
+            }
+
+            for (let i = 0; i < mappedSegments; i++) {
+                for (let j = 0; j < mappedSegments; j++) {
+                    const a = i * (mappedSegments + 1) + j;
+                    const b = a + 1;
+                    const c = (i + 1) * (mappedSegments + 1) + j;
+                    const d = c + 1;
+                    mappedIndices.push(a, c, b);
+                    mappedIndices.push(b, c, d);
+                }
+            }
+
+            mappedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(mappedVertices, 3));
+            mappedGeometry.setIndex(mappedIndices);
+            mappedGeometry.computeVertexNormals();
+            mappedRect = new THREE.Mesh(mappedGeometry, mappedRectMaterial);
+            scene.add(mappedRect);
+
+            // Label f(x₀, y₀)
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 64;
+            const context = canvas.getContext('2d');
+            context.font = '20px Arial';
+            context.fillStyle = 'black';
+            context.fillText('f(x₀, y₀)', 10, 30);
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.position.set(x0, f(x0, y0) + 0.3, y0);
+            sprite.scale.set(0.5, 0.25, 1);
+            scene.add(sprite);
+        }
+
+        // Update scene
+        function updateScene() {
+            scene.remove(intervalLine, intervalBox, leftLabel, rightLabel, rectangle, rectLines, surface, baseRect, mappedRect);
+            rectLabels.forEach(label => scene.remove(label));
+            rectLabels = [];
+            createCenterPoint();
+            createAxes();
+            if (stage === 1) {
+                createInterval();
+                infoText.textContent = shrinking ? 'Stage: 1D Interval Shrinking' : 'Stage: 1D Interval';
+            } else if (stage === 2) {
+                createRectangle();
+                infoText.textContent = shrinking ? 'Stage: 2D Rectangle Shrinking' : 'Stage: 2D Rectangle';
+            } else if (stage === 3) {
+                create3DPlot();
+                infoText.textContent = shrinking ? 'Stage: 3D Neighborhood Shrinking' : 'Stage: 3D Surface';
+            } else {
+                infoText.textContent = 'Stage: Initial Setup';
+            }
+            renderer.render(scene, camera);
+        }
+
+        // Camera for 3D
+        function setCameraForStage3() {
+            const distance = 5;
+            const zAngle = -40 * Math.PI / 180; // 40° clockwise (negative)
+            const xAngle = 30 * Math.PI / 180; // 30° around x-axis
+
+            // Base position in xy-plane (Three.js xz-plane)
+            let x = distance * Math.cos(zAngle);
+            let z = distance * Math.sin(zAngle);
+            let y = 0;
+
+            // Apply x-axis rotation (tilt down)
+            const tiltedY = distance * Math.sin(xAngle);
+            const tiltFactor = distance * Math.cos(xAngle);
+            x = tiltFactor * Math.cos(zAngle);
+            z = tiltFactor * Math.sin(zAngle);
+            y = tiltedY;
+
+            camera.position.set(x, y, z);
+            camera.lookAt(x0, 0, y0);
+        }
+
+        // Animations
+        function animateStage1() {
+            a = defaultA;
+            aSlider.value = a;
+            updateScene();
+            shrinking = true;
+            function shrink() {
+                if (shrinking && stage === 1) {
+                    a -= 0.01;
+                    if (a <= minA) {
+                        a = minA;
+                        shrinking = false;
+                        infoText.textContent = 'Stage: 1D Interval';
+                    }
+                    aSlider.value = a;
+                    updateScene();
+                    requestAnimationFrame(shrink);
+                }
+            }
+            shrink();
+        }
+
+        function animateStage2() {
+            a = defaultA;
+            b = defaultB;
+            aSlider.value = a;
+            bSlider.value = b;
+            updateScene();
+            shrinking = true;
+            function shrink() {
+                if (shrinking && stage === 2) {
+                    a -= 0.01;
+                    b -= 0.01;
+                    if (a <= minA && b <= minB) {
+                        a = minA;
+                        b = minB;
+                        shrinking = false;
+                        infoText.textContent = 'Stage: 2D Rectangle';
+                    }
+                    aSlider.value = a;
+                    bSlider.value = b;
+                    updateScene();
+                    requestAnimationFrame(shrink);
+                }
+            }
+            shrink();
+        }
+
+        function animateStage3() {
+            a = defaultA;
+            b = defaultB;
+            aSlider.value = a;
+            bSlider.value = b;
+            setCameraForStage3();
+            updateScene();
+            shrinking = true;
+            function shrink() {
+                if (shrinking && stage === 3) {
+                    a -= 0.01;
+                    b -= 0.01;
+                    if (a <= minA && b <= minB) {
+                        a = minA;
+                        b = minB;
+                        shrinking = false;
+                        infoText.textContent = 'Stage: 3D Surface';
+                    }
+                    aSlider.value = a;
+                    bSlider.value = b;
+                    updateScene();
+                    requestAnimationFrame(shrink);
+                }
+            }
+            shrink();
+        }
+
+        // Buttons
+        document.getElementById('stage1Button').addEventListener('click', () => {
+            stage = 1;
+            scene.rotation.set(0, 0, 0);
+            camera.position.set(0, 0, 5);
+            camera.lookAt(x0, y0, 0);
+            animateStage1();
+        });
+
+        document.getElementById('stage2Button').addEventListener('click', () => {
+            stage = 2;
+            scene.rotation.set(0, 0, 0);
+            camera.position.set(0, 0, 5);
+            camera.lookAt(x0, y0, 0);
+            animateStage2();
+        });
+
+        document.getElementById('stage3Button').addEventListener('click', () => {
+            stage = 3;
+            scene.rotation.set(0, 0, 0);
+            animateStage3();
+        });
+
+        document.getElementById('saveButton').addEventListener('click', () => {
+            renderer.render(scene, camera);
+            const link = document.createElement('a');
+            link.download = 'neighborhood_plot.png';
+            link.href = renderer.domElement.toDataURL('image/png');
+            link.click();
+        });
+
+        // Initial setup
+        updateScene();
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.render(scene, camera);
+        });
+    </script>
+</body>
+</html>
