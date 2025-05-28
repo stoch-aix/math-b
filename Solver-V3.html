@@ -1,0 +1,530 @@
+<!-- 
+(C) 2025 by Ansgar Steland
+Published under the Academic Research Software Licence 1.0
+Created with the help of AI
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linear System Solver</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { padding: 20px; }
+        input[type="number"] { width: 80px; }
+        .step-container { display: flex; align-items: center; margin-bottom: 20px; }
+        .arrow-canvas { margin-left: 20px; }
+        .error { color: red; }
+        canvas.graph { border: 1px solid #ccc; max-width: 100%; }
+        .mathjax-container { font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Linear System Solver</h1>
+        <div class="mb-3">
+            <label for="rows" class="form-label">Number of Rows (1-10):</label>
+            <input type="number" id="rows" class="form-control w-25 d-inline-block" value="2" min="1" max="10">
+            <label for="cols" class="form-label ms-3">Number of Columns (1-10):</label>
+            <input type="number" id="cols" class="form-control w-25 d-inline-block" value="2" min="1" max="10">
+            <button class="btn btn-primary mt-2" onclick="generateMatrix()">Generate Matrix</button>
+        </div>
+        <div id="matrixInput"></div>
+        <div class="mb-3">
+            <button class="btn btn-success" onclick="solve()">Solve System</button>
+        </div>
+        <div id="steps"></div>
+        <div id="solution"></div>
+        <canvas id="graph" width="400" height="400" class="graph d-none"></canvas>
+        <p id="graphCaption"></p>
+    </div>
+
+    <script>
+        let m = 2; // Number of rows
+        let n = 2; // Number of columns
+        let A = [];
+        let b = [];
+
+        // Rational number utilities
+        function gcd(a, b) {
+            a = Math.abs(a);
+            b = Math.abs(b);
+            while (b) {
+                let temp = b;
+                b = a % b;
+                a = temp;
+            }
+            return a;
+        }
+
+        function simplify(num, den) {
+            if (den === 0) throw new Error("Denominator cannot be zero");
+            if (num === 0) return { num: 0, den: 1 };
+            const g = gcd(num, den);
+            const sign = den < 0 ? -1 : 1;
+            return { num: (num / g) * sign, den: (den / g) * sign };
+        }
+
+        function add(a, b) {
+            const num = a.num * b.den + b.num * a.den;
+            const den = a.den * b.den;
+            return simplify(num, den);
+        }
+
+        function subtract(a, b) {
+            const num = a.num * b.den - b.num * a.den;
+            const den = a.den * b.den;
+            return simplify(num, den);
+        }
+
+        function multiply(a, b) {
+            const num = a.num * b.num;
+            const den = a.den * b.den;
+            return simplify(num, den);
+        }
+
+        function divide(a, b) {
+            if (b.num === 0) throw new Error("Division by zero");
+            const num = a.num * b.den;
+            const den = a.den * b.num;
+            return simplify(num, den);
+        }
+
+        function abs(a) {
+            return { num: Math.abs(a.num), den: a.den };
+        }
+
+        function toFloat(a) {
+            return a.num / a.den;
+        }
+
+        function toString(a) {
+            if (a.den === 1) return a.num.toString();
+            if (a.num === 0) return "0";
+            return `\\frac{${a.num}}{${a.den}}`;
+        }
+
+        function generateMatrix() {
+            m = parseInt(document.getElementById('rows').value);
+            n = parseInt(document.getElementById('cols').value);
+            if (m < 1 || m > 10 || n < 1 || n > 10) {
+                alert('Please enter rows and columns between 1 and 10.');
+                return;
+            }
+            A = Array(m).fill().map(() => Array(n).fill({ num: 0, den: 1 }));
+            b = Array(m).fill({ num: 0, den: 1 });
+
+            let html = '<h3>Enter Coefficients and RHS</h3><table class="table table-bordered"><tr>';
+            for (let j = 0; j < n; j++) html += `<th>x${j + 1}</th>`;
+            html += '<th>RHS</th></tr>';
+            for (let i = 0; i < m; i++) {
+                html += '<tr>';
+                for (let j = 0; j < n; j++) {
+                    html += `<td><input type="number" class="form-control" id="a_${i}_${j}" value="0" step="any"></td>`;
+                }
+                html += `<td><input type="number" class="form-control" id="b_${i}" value="0" step="any"></td></tr>`;
+            }
+            html += '</table>';
+            document.getElementById('matrixInput').innerHTML = html;
+            document.getElementById('steps').innerHTML = '';
+            document.getElementById('solution').innerHTML = '';
+            document.getElementById('graph').classList.add('d-none');
+            document.getElementById('graphCaption').innerHTML = '';
+        }
+
+        function readMatrix() {
+            for (let i = 0; i < m; i++) {
+                for (let j = 0; j < n; j++) {
+                    const val = parseFloat(document.getElementById(`a_${i}_${j}`).value) || 0;
+                    A[i][j] = simplify(Math.round(val * 10000), 10000);
+                }
+                const val = parseFloat(document.getElementById(`b_${i}`).value) || 0;
+                b[i] = simplify(Math.round(val * 10000), 10000);
+            }
+        }
+
+        function matrixToString(A, b, m, n) {
+            let str = '\\begin{bmatrix} ';
+            for (let i = 0; i < m; i++) {
+                for (let j = 0; j < n; j++) {
+                    str += toString(A[i][j]) + (j < n - 1 ? ' & ' : '');
+                }
+                str += ' & ' + toString(b[i]);
+                str += i < m - 1 ? ' \\\\ ' : '';
+            }
+            str += ' \\end{bmatrix}';
+            return str;
+        }
+
+        function drawArrow(canvasId, fromRow, toRow, m, stepType) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const rowHeight = canvas.height / m;
+            const offset = -5;
+            const startY = (fromRow - 1 + 0.5) * rowHeight + offset;
+            const endY = (toRow - 1 + 0.5) * rowHeight + offset;
+            const midX = canvas.width / 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.moveTo(midX, startY);
+            ctx.bezierCurveTo(canvas.width, startY, canvas.width, endY, midX, endY);
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw arrowhead at end (for elimination and swap)
+            const angleTo = Math.atan2(endY - startY, midX - canvas.width);
+            ctx.beginPath();
+            ctx.moveTo(midX, endY);
+            ctx.lineTo(midX - 10 * Math.cos(angleTo - Math.PI / 6), endY - 10 * Math.sin(angleTo - Math.PI / 6));
+            ctx.moveTo(midX, endY);
+            ctx.lineTo(midX - 10 * Math.cos(angleTo + Math.PI / 6), endY - 10 * Math.sin(angleTo + Math.PI / 6));
+            ctx.stroke();
+
+            // Draw arrowhead at start (for swap only)
+            if (stepType === 'swap') {
+                const angleFrom = Math.atan2(startY - endY, midX - canvas.width);
+                ctx.beginPath();
+                ctx.moveTo(midX, startY);
+                ctx.lineTo(midX - 10 * Math.cos(angleFrom - Math.PI / 6), startY - 10 * Math.sin(angleFrom - Math.PI / 6));
+                ctx.moveTo(midX, startY);
+                ctx.lineTo(midX - 10 * Math.cos(angleFrom + Math.PI / 6), startY - 10 * Math.sin(angleFrom + Math.PI / 6));
+                ctx.stroke();
+            }
+        }
+
+        function solve() {
+            readMatrix();
+            document.getElementById('steps').innerHTML = '';
+            document.getElementById('solution').innerHTML = '';
+            document.getElementById('graph').classList.add('d-none');
+            document.getElementById('graphCaption').innerHTML = '';
+
+            let steps = [];
+            let A_copy = A.map(row => [...row]);
+            let b_copy = [...b];
+
+            // Gaussian Elimination with Partial Pivoting
+            let rank = 0;
+            let pivotCols = [];
+            let k = 0;
+            while (k < Math.min(m, n)) {
+                let max = abs(A_copy[k][k] || { num: 0, den: 1 });
+                let maxRow = k;
+                for (let i = k + 1; i < m; i++) {
+                    const absVal = abs(A_copy[i][k]);
+                    if (toFloat(absVal) > toFloat(max)) {
+                        max = absVal;
+                        maxRow = i;
+                    }
+                }
+                if (toFloat(max) < 1e-10) {
+                    k++;
+                    continue;
+                }
+                rank++;
+                pivotCols.push(k);
+
+                if (maxRow !== k) {
+                    [A_copy[k], A_copy[maxRow]] = [A_copy[maxRow], A_copy[k]];
+                    [b_copy[k], b_copy[maxRow]] = [b_copy[maxRow], b_copy[k]];
+                    steps.push({
+                        description: `R_${k + 1} \\leftrightarrow R_${maxRow + 1}`,
+                        matrix: matrixToString(A_copy, b_copy, m, n),
+                        canvasId: `arrow_${steps.length}`,
+                        fromRow: k + 1,
+                        toRow: maxRow + 1,
+                        stepType: 'swap'
+                    });
+                }
+
+                // Forward elimination
+                for (let i = k + 1; i < m; i++) {
+                    let factor = divide(A_copy[i][k], A_copy[k][k]);
+                    if (toFloat(abs(factor)) > 1e-10) {
+                        for (let j = k + 1; j < n; j++) {
+                            A_copy[i][j] = subtract(A_copy[i][j], multiply(factor, A_copy[k][j]));
+                        }
+                        b_copy[i] = subtract(b_copy[i], multiply(factor, b_copy[k]));
+                        A_copy[i][k] = { num: 0, den: 1 };
+                        steps.push({
+                            description: `R_${i + 1} \\to R_${i + 1} - (${toString(factor)}) R_${k + 1}`,
+                            matrix: matrixToString(A_copy, b_copy, m, n),
+                            canvasId: `arrow_${steps.length}`,
+                            fromRow: k + 1,
+                            toRow: i + 1,
+                            stepType: 'elimination'
+                        });
+                    }
+                }
+                k++;
+            }
+
+            // Back substitution to achieve reduced row echelon form
+            for (let k = rank - 1; k >= 0; k--) {
+                let pivotCol = pivotCols[k];
+                // Normalize pivot row
+                let pivot = A_copy[k][pivotCol];
+                if (toFloat(abs(pivot)) > 1e-10) {
+                    for (let j = pivotCol; j < n; j++) {
+                        A_copy[k][j] = divide(A_copy[k][j], pivot);
+                    }
+                    b_copy[k] = divide(b_copy[k], pivot);
+                    steps.push({
+                        description: `R_${k + 1} \\to \\frac{1}{${toString(pivot)}} R_${k + 1}`,
+                        matrix: matrixToString(A_copy, b_copy, m, n),
+                        canvasId: null
+                    });
+                }
+
+                // Eliminate entries above pivot
+                for (let i = 0; i < k; i++) {
+                    let factor = A_copy[i][pivotCol];
+                    if (toFloat(abs(factor)) > 1e-10) {
+                        for (let j = pivotCol; j < n; j++) {
+                            A_copy[i][j] = subtract(A_copy[i][j], multiply(factor, A_copy[k][j]));
+                        }
+                        b_copy[i] = subtract(b_copy[i], multiply(factor, b_copy[k]));
+                        steps.push({
+                            description: `R_${i + 1} \\to R_${i + 1} - (${toString(factor)}) R_${k + 1}`,
+                            matrix: matrixToString(A_copy, b_copy, m, n),
+                            canvasId: `arrow_${steps.length}`,
+                            fromRow: k + 1,
+                            toRow: i + 1,
+                            stepType: 'elimination'
+                        });
+                    }
+                }
+            }
+
+            // Check for inconsistency
+            let isConsistent = true;
+            for (let i = rank; i < m; i++) {
+                if (toFloat(abs(b_copy[i])) > 1e-10) {
+                    isConsistent = false;
+                    break;
+                }
+            }
+
+            // Display steps
+            let stepsHtml = '<h3>Steps</h3>';
+            stepsHtml += '<div class="step-container"><div class="mathjax-container">\\[';
+            stepsHtml += ' \\text{Initial augmented matrix:} \\\\ ' + matrixToString(A, b, m, n);
+            stepsHtml += '\\]</div></div>';
+
+            steps.forEach((step, index) => {
+                stepsHtml += '<div class="step-container">';
+                stepsHtml += '<div class="mathjax-container">\\[';
+                stepsHtml += `\\text{Step ${index + 1}: } ${step.description} \\\\[30pt] ${step.matrix}`;
+                stepsHtml += '\\]</div>';
+                if (step.canvasId) {
+                    stepsHtml += `<canvas id="${step.canvasId}" class="arrow-canvas" width="100" height="${m * 30}"></canvas>`;
+                } else {
+                    stepsHtml += '<div class="arrow-canvas" style="width: 100px;"></div>';
+                }
+                stepsHtml += '</div>';
+            });
+            document.getElementById('steps').innerHTML = stepsHtml;
+
+            // Render arrows after DOM update
+            steps.forEach((step, index) => {
+                if (step.canvasId) {
+                    drawArrow(step.canvasId, step.fromRow, step.toRow, m, step.stepType);
+                }
+            });
+
+            // Handle solutions
+            if (!isConsistent) {
+                document.getElementById('solution').innerHTML = '<p class="error">Error: System is inconsistent.</p>';
+                return;
+            }
+
+            // Compute solutions
+            let solutionHtml = '<h3>Solution</h3>';
+            if (rank === n && rank === m) {
+                // Unique solution
+                let x = Array(n).fill({ num: 0, den: 1 });
+                for (let i = 0; i < n; i++) {
+                    x[i] = b_copy[i];
+                }
+                solutionHtml += '<p>Unique solution:<br>\\[ \\mathbf{x} = \\begin{bmatrix} ';
+                for (let i = 0; i < n; i++) {
+                    solutionHtml += toString(x[i]);
+                    solutionHtml += i < n - 1 ? ' \\\\ ' : '';
+                }
+                solutionHtml += ' \\end{bmatrix} \\]</p>';
+            } else {
+                // Infinitely many solutions
+                let freeVars = n - rank;
+                solutionHtml += `<p>System has infinitely many solutions with ${freeVars} free variable(s).</p>`;
+                solutionHtml += '<p><b>Parametric Solution:</b><br>';
+
+                // Initialize solution vector
+                let x = Array(n).fill(null);
+                let freeVarsIndices = [];
+                for (let j = 0; j < n; j++) {
+                    if (!pivotCols.includes(j)) {
+                        freeVarsIndices.push(j);
+                        x[j] = `x_${j + 1}`;
+                    }
+                }
+
+                // Compute particular solution and basis for null space
+                let particular = Array(n).fill({ num: 0, den: 1 });
+                let nullSpace = freeVarsIndices.map((index, paramIdx) => {
+                    let vec = Array(n).fill({ num: 0, den: 1 });
+                    vec[index] = { num: 1, den: 1 };
+                    for (let i = 0; i < rank; i++) {
+                        let pivotCol = pivotCols[i];
+                        vec[pivotCol] = simplify(-A_copy[i][index].num, A_copy[i][index].den);
+                    }
+                    return vec;
+                });
+
+                for (let i = 0; i < rank; i++) {
+                    let pivotCol = pivotCols[i];
+                    particular[pivotCol] = b_copy[i];
+                }
+
+                // Format parametric solution
+                solutionHtml += '\\[ \\mathbf{x} = \\begin{bmatrix} ';
+                for (let j = 0; j < n; j++) {
+                    solutionHtml += toString(particular[j]);
+                    nullSpace.forEach((vec, idx) => {
+                        if (toFloat(abs(vec[j])) > 1e-10) {
+                            let sign = vec[j].num > 0 ? '+' : '-';
+                            let coeff = toString(simplify(Math.abs(vec[j].num), vec[j].den));
+                            let param = `x_${freeVarsIndices[idx] + 1}`;
+                            solutionHtml += ` ${sign} ${coeff} ${param}`;
+                        }
+                    });
+                    solutionHtml += j < n - 1 ? ' \\\\ ' : '';
+                }
+                solutionHtml += ' \\end{bmatrix} \\]';
+            }
+
+            document.getElementById('solution').innerHTML = solutionHtml;
+
+            // Plot for 2x2 systems only
+            if (m === 2 && n === 2 && isConsistent && rank === n) {
+                let x = Array(n).fill({ num: 0, den: 1 });
+                for (let i = 0; i < n; i++) {
+                    x[i] = b_copy[i];
+                }
+                drawGraph(x, A, b, rank, false);
+            } else if (m === 2 && n === 2 && isConsistent && rank < n) {
+                drawGraph(null, A_copy, b_copy, rank, true);
+            } else if (m !== 2 || n !== 2) {
+                document.getElementById('graphCaption').innerHTML = 'Graphing is only available for 2x2 systems.';
+            }
+
+            // Trigger MathJax rendering
+            MathJax.typeset();
+        }
+
+        function drawGraph(x, A_plot, b_plot, rank, isInfinite) {
+            const canvas = document.getElementById('graph');
+            const ctx = canvas.getContext('2d');
+            canvas.classList.remove('d-none');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Graph settings
+            const w = canvas.width, h = canvas.height;
+            const cx = w / 2, cy = h / 2;
+            const maxVal = Math.max(5, ...(x ? x.map(a => Math.abs(toFloat(a))) : []), ...b_plot.map(a => Math.abs(toFloat(a))), ...A_plot.flat().map(a => Math.abs(toFloat(a))));
+            const scale = 200 / maxVal;
+
+            // Draw axes
+            ctx.beginPath();
+            ctx.moveTo(0, cy);
+            ctx.lineTo(w, cy);
+            ctx.moveTo(cx, 0);
+            ctx.lineTo(cx, h);
+            ctx.strokeStyle = 'black';
+            ctx.stroke();
+
+            // Draw grid
+            ctx.strokeStyle = '#ddd';
+            for (let i = -maxVal; i <= maxVal; i += maxVal / 5) {
+                ctx.beginPath();
+                ctx.moveTo(cx + i * scale, 0);
+                ctx.lineTo(cx + i * scale, h);
+                ctx.moveTo(0, cy - i * scale);
+                ctx.lineTo(w, cy - i * scale);
+                ctx.stroke();
+            }
+
+            // Draw lines
+            if (isInfinite) {
+                // Plot single line for infinitely many solutions
+                ctx.beginPath();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+                let a1 = A_plot[0][0], a2 = A_plot[0][1], b_val = b_plot[0];
+                if (Math.abs(toFloat(a2)) > 1e-10) {
+                    let x1 = -maxVal, y1 = toFloat(divide(subtract(b_val, multiply(a1, { num: Math.round(x1 * 10000), den: 10000 })), a2));
+                    let x2 = maxVal, y2 = toFloat(divide(subtract(b_val, multiply(a1, { num: Math.round(x2 * 10000), den: 10000 })), a2));
+                    ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                    ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                } else if (Math.abs(toFloat(a1)) > 1e-10) {
+                    let x_val = toFloat(divide(b_val, a1));
+                    ctx.moveTo(cx + x_val * scale, 0);
+                    ctx.lineTo(cx + x_val * scale, h);
+                } else if (Math.abs(toFloat(b_val)) < 1e-10) {
+                    let x1 = -maxVal, y1 = 0;
+                    let x2 = maxVal, y2 = 0;
+                    ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                    ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                }
+                ctx.stroke();
+            } else {
+                // Plot two lines for unique solution
+                const colors = ['blue', 'red'];
+                for (let i = 0; i < 2; i++) {
+                    let a1 = A_plot[i][0], a2 = A_plot[i][1], b_val = b_plot[i];
+                    ctx.beginPath();
+                    ctx.strokeStyle = colors[i];
+                    ctx.lineWidth = 2;
+                    if (Math.abs(toFloat(a2)) > 1e-10) {
+                        let x1 = -maxVal, y1 = toFloat(divide(subtract(b_val, multiply(a1, { num: Math.round(x1 * 10000), den: 10000 })), a2));
+                        let x2 = maxVal, y2 = toFloat(divide(subtract(b_val, multiply(a1, { num: Math.round(x2 * 10000), den: 10000 })), a2));
+                        ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                        ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                    } else if (Math.abs(toFloat(a1)) > 1e-10) {
+                        let x_val = toFloat(divide(b_val, a1));
+                        ctx.moveTo(cx + x_val * scale, 0);
+                        ctx.lineTo(cx + x_val * scale, h);
+                    } else if (Math.abs(toFloat(b_val)) < 1e-10) {
+                        let x1 = -maxVal, y1 = 0;
+                        let x2 = maxVal, y2 = 0;
+                        ctx.moveTo(cx + x1 * scale, cy - y1 * scale);
+                        ctx.lineTo(cx + x2 * scale, cy - y2 * scale);
+                    }
+                    ctx.stroke();
+                }
+
+                // Draw solution point
+                ctx.beginPath();
+                ctx.arc(cx + toFloat(x[0]) * scale, cy - toFloat(x[1]) * scale, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = 'green';
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+            }
+
+            // Set caption
+            const caption = isInfinite
+                ? 'The plot shows a single line, where every point (x1, x2) on the line represents a solution to the system, indicating infinitely many solutions.'
+                : 'The plot shows two lines intersecting at the green point, which represents the unique solution (x1, x2) to the system.';
+            document.getElementById('graphCaption').innerHTML = caption;
+        }
+    </script>
+</body>
+</html>
+
