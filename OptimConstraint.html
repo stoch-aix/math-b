@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lagrange Multiplier Visualizer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ec 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            min-width: 300px;
+        }
+        .visualization {
+            flex: 2;
+            min-width: 500px;
+        }
+        #contour-plot {
+            width: 100%;
+            height: 550px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        }
+        select, button {
+            padding: 12px 15px;
+            margin: 10px 0;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        select:hover, button:hover {
+            border-color: #3498db;
+            box-shadow: 0 0 8px rgba(52, 152, 219, 0.3);
+        }
+        button {
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            padding: 14px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.4);
+        }
+        .formula {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+            font-size: 18px;
+        }
+        h2 {
+            margin-top: 25px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+            color: #2c3e50;
+        }
+        h3 {
+            color: #3498db;
+            margin-top: 20px;
+        }
+        .results {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        .solution {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+        }
+        .minima {
+            border-left-color: #2ecc71;
+        }
+        .maxima {
+            border-left-color: #e74c3c;
+        }
+        .saddle {
+            border-left-color: #f39c12;
+        }
+        .point-info {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .point-details {
+            flex: 1;
+            min-width: 250px;
+        }
+        .hessian-matrix {
+            flex: 1;
+            min-width: 250px;
+            font-family: monospace;
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .classification {
+            font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .minima-bg {
+            background: #2ecc71;
+            color: white;
+        }
+        .maxima-bg {
+            background: #e74c3c;
+            color: white;
+        }
+        .saddle-bg {
+            background: #f39c12;
+            color: white;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        .matrix {
+            display: inline-block;
+            margin: 10px 0;
+            border-collapse: collapse;
+        }
+        .matrix td {
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .panel, .visualization {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Lagrange Multiplier Visualizer</h1>
+        <p>Interactive visualization of constrained optimization with Hessian analysis</p>
+    </div>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Function Selection</h2>
+            
+            <label for="f-select">Select function f(x,y) to minimize:</label>
+            <select id="f-select">
+                <option value="0">x² + y²</option>
+                <option value="1">x² + 4y²</option>
+                <option value="2">x + y</option>
+                <option value="3">x² - y</option>
+                <option value="4">e^(x) + y²</option>
+            </select>
+            
+            <label for="g-select">Select constraint g(x,y) = 0:</label>
+            <select id="g-select">
+                <option value="0">x + y - 2 = 0</option>
+                <option value="1">x² + y² - 1 = 0</option>
+                <option value="2">x² + 4y² - 4 = 0</option>
+                <option value="3">x - y² = 0</option>
+                <option value="4">2x + y - 3 = 0</option>
+            </select>
+            
+            <button id="calculate-btn">Calculate Critical Points</button>
+            
+            <h2>Mathematical Formulation</h2>
+            <div class="formula">
+                <p>We minimize \( f(x,y) \) subject to \( g(x,y) = 0 \) using Lagrange multipliers by solving:</p>
+                <p>\[ \nabla f(x,y) = \lambda \nabla g(x,y) \]</p>
+                <p>\[ g(x,y) = 0 \]</p>
+                <p>Critical points are classified using the Hessian of the Lagrangian:</p>
+                <p>\[ H = \begin{bmatrix} 
+                \frac{\partial^2 \mathcal{L}}{\partial x^2} & \frac{\partial^2 \mathcal{L}}{\partial x \partial y} \\
+                \frac{\partial^2 \mathcal{L}}{\partial x \partial y} & \frac{\partial^2 \mathcal{L}}{\partial y^2}
+                \end{bmatrix} \]</p>
+                <p>where \( \mathcal{L} = f - \lambda g \) is the Lagrangian.</p>
+            </div>
+        </div>
+        
+        <div class="visualization">
+            <h2>Visualization</h2>
+            <div id="contour-plot"></div>
+            <p>Contour plot shows f(x,y) with constraint g(x,y)=0 as a black curve. Critical points are color-coded:</p>
+            <div style="display: flex; gap: 20px; margin-top: 10px;">
+                <div><span style="display: inline-block; width: 15px; height: 15px; background: #2ecc71; border-radius: 50%;"></span> Local Minima</div>
+                <div><span style="display: inline-block; width: 15px; height: 15px; background: #e74c3c; border-radius: 50%;"></span> Local Maxima</div>
+                <div><span style="display: inline-block; width: 15px; height: 15px; background: #f39c12; border-radius: 50%;"></span> Saddle Points</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="results" id="results">
+        <h2>Results</h2>
+        <p>Select functions and click "Calculate Critical Points" to see analysis.</p>
+    </div>
+
+    <div class="footer">
+        <p>Lagrange Multiplier Visualizer | Constrained Optimization | Hessian Analysis</p>
+    </div>
+
+    <script>
+        // Function definitions
+        const functions = [
+            { 
+                name: "x² + y²", 
+                func: (x, y) => x*x + y*y, 
+                grad: (x, y) => [2*x, 2*y],
+                hessian: (x, y) => [[2, 0], [0, 2]]
+            },
+            { 
+                name: "x² + 4y²", 
+                func: (x, y) => x*x + 4*y*y, 
+                grad: (x, y) => [2*x, 8*y],
+                hessian: (x, y) => [[2, 0], [0, 8]]
+            },
+            { 
+                name: "x + y", 
+                func: (x, y) => x + y, 
+                grad: (x, y) => [1, 1],
+                hessian: (x, y) => [[0, 0], [0, 0]]
+            },
+            { 
+                name: "x² - y", 
+                func: (x, y) => x*x - y, 
+                grad: (x, y) => [2*x, -1],
+                hessian: (x, y) => [[2, 0], [0, 0]]
+            },
+            { 
+                name: "e^{x} + y²", 
+                func: (x, y) => Math.exp(x) + y*y, 
+                grad: (x, y) => [Math.exp(x), 2*y],
+                hessian: (x, y) => [[Math.exp(x), 0], [0, 2]]
+            }
+        ];
+
+        // Constraint definitions
+        const constraints = [
+            { 
+                name: "x + y - 2 = 0", 
+                func: (x, y) => x + y - 2, 
+                grad: (x, y) => [1, 1],
+                hessian: (x, y) => [[0, 0], [0, 0]]
+            },
+            { 
+                name: "x² + y² - 1 = 0", 
+                func: (x, y) => x*x + y*y - 1, 
+                grad: (x, y) => [2*x, 2*y],
+                hessian: (x, y) => [[2, 0], [0, 2]]
+            },
+            { 
+                name: "x² + 4y² - 4 = 0", 
+                func: (x, y) => x*x + 4*y*y - 4, 
+                grad: (x, y) => [2*x, 8*y],
+                hessian: (x, y) => [[2, 0], [0, 8]]
+            },
+            { 
+                name: "x - y² = 0", 
+                func: (x, y) => x - y*y, 
+                grad: (x, y) => [1, -2*y],
+                hessian: (x, y) => [[0, 0], [0, -2]]
+            },
+            { 
+                name: "2x + y - 3 = 0", 
+                func: (x, y) => 2*x + y - 3, 
+                grad: (x, y) => [2, 1],
+                hessian: (x, y) => [[0, 0], [0, 0]]
+            }
+        ];
+
+        // Function to generate grid data
+        function generateGridData(f, xMin = -3, xMax = 3, yMin = -3, yMax = 3, steps = 50) {
+            const xValues = [];
+            const yValues = [];
+            const zValues = [];
+            const xStep = (xMax - xMin) / steps;
+            const yStep = (yMax - yMin) / steps;
+            
+            for (let i = 0; i <= steps; i++) {
+                const x = xMin + i * xStep;
+                xValues.push(x);
+                yValues[i] = [];
+                zValues[i] = [];
+                
+                for (let j = 0; j <= steps; j++) {
+                    const y = yMin + j * yStep;
+                    yValues[i][j] = y;
+                    zValues[i][j] = f(x, y);
+                }
+            }
+            
+            return { x: xValues, y: yValues, z: zValues };
+        }
+
+        // Function to generate constraint line data
+        function generateConstraintData(g, xMin = -3, xMax = 3, steps = 200) {
+            const xValues = [];
+            const yValues = [];
+            const xStep = (xMax - xMin) / steps;
+            
+            for (let i = 0; i <= steps; i++) {
+                const x = xMin + i * xStep;
+                let yLow = -3;
+                let yHigh = 3;
+                let yMid;
+                let attempts = 0;
+                const maxAttempts = 50;
+                const tolerance = 1e-6;
+                
+                while (attempts < maxAttempts && (yHigh - yLow) > tolerance) {
+                    yMid = (yLow + yHigh) / 2;
+                    const val = g(x, yMid);
+                    
+                    if (Math.abs(val) < tolerance) {
+                        break;
+                    } else if (val > 0) {
+                        yHigh = yMid;
+                    } else {
+                        yLow = yMid;
+                    }
+                    attempts++;
+                }
+                
+                if (attempts < maxAttempts) {
+                    xValues.push(x);
+                    yValues.push(yMid);
+                }
+            }
+            
+            return { x: xValues, y: yValues };
+        }
+
+        // Function to compute Hessian numerically
+        function numericalHessian(f, x, y, h = 0.001) {
+            // Second derivatives
+            const fxx = (f(x+h, y) - 2*f(x, y) + f(x-h, y)) / (h*h);
+            const fyy = (f(x, y+h) - 2*f(x, y) + f(x, y-h)) / (h*h);
+            const fxy = (f(x+h, y+h) - f(x+h, y-h) - f(x-h, y+h) + f(x-h, y-h)) / (4*h*h);
+            
+            return [[fxx, fxy], [fxy, fyy]];
+        }
+
+        // Function to compute determinant of 2x2 matrix
+        function determinant2x2(matrix) {
+            return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+        }
+
+        // Classify critical point using Hessian definiteness
+        function classifyCriticalPoint(f, g, sol) {
+            const {x, y, lambda} = sol;
+            
+            // Compute Hessian of Lagrangian
+            let Lxx, Lyy, Lxy;
+            
+            if (f.hessian && g.hessian) {
+                // Use analytical Hessians if available
+                const fHess = f.hessian(x, y);
+                const gHess = g.hessian(x, y);
+                
+                Lxx = fHess[0][0] - lambda * gHess[0][0];
+                Lxy = fHess[0][1] - lambda * gHess[0][1];
+                Lyy = fHess[1][1] - lambda * gHess[1][1];
+            } else {
+                // Compute numerically
+                const fHess = numericalHessian(f.func, x, y);
+                const gHess = numericalHessian(g.func, x, y);
+                
+                Lxx = fHess[0][0] - lambda * gHess[0][0];
+                Lxy = fHess[0][1] - lambda * gHess[0][1];
+                Lyy = fHess[1][1] - lambda * gHess[1][1];
+            }
+            
+            // Build Hessian matrix
+            const hessian = [[Lxx, Lxy], [Lxy, Lyy]];
+            
+            // Compute determinants of leading principal minors
+            const det1 = Lxx;
+            const det2 = determinant2x2(hessian);
+            
+            // Classify based on Sylvester's criterion
+            let classification = "saddle point";
+            let typeClass = "saddle";
+            
+            if (det1 > 0 && det2 > 0) {
+                classification = "local minimum";
+                typeClass = "minima";
+            } else if (det1 < 0 && det2 > 0) {
+                classification = "local maximum";
+                typeClass = "maxima";
+            }
+            
+            return {
+                hessian,
+                det1,
+                det2,
+                classification,
+                typeClass,
+                Lxx, Lyy, Lxy
+            };
+        }
+
+        // Robust solver implementation
+        function solveLagrange(f, g, initialGuess = [1, 1]) {
+            const [x0, y0] = initialGuess;
+            let x = x0;
+            let y = y0;
+            let lambda = 0;
+            const learningRate = 0.01;
+            const maxIterations = 5000;
+            const tolerance = 1e-6;
+            
+            for (let i = 0; i < maxIterations; i++) {
+                const [dfx, dfy] = f.grad(x, y);
+                const [dgx, dgy] = g.grad(x, y);
+                const gVal = g.func(x, y);
+                
+                // Compute the loss function
+                const loss = 
+                    Math.pow(dfx - lambda * dgx, 2) +
+                    Math.pow(dfy - lambda * dgy, 2) +
+                    Math.pow(gVal, 2);
+                
+                if (loss < tolerance) {
+                    break;
+                }
+                
+                // Compute gradients of loss
+                const dL_dx = 
+                    2 * (dfx - lambda * dgx) * (f.grad(x+0.001, y)[0] - dfx) * 1000 +
+                    2 * (dfy - lambda * dgy) * (f.grad(x, y+0.001)[1] - dfy) * 1000 +
+                    2 * gVal * dgx;
+                
+                const dL_dy = 
+                    2 * (dfx - lambda * dgx) * (f.grad(x, y+0.001)[0] - dfx) * 1000 +
+                    2 * (dfy - lambda * dgy) * (f.grad(x, y+0.001)[1] - dfy) * 1000 +
+                    2 * gVal * dgy;
+                
+                const dL_dlambda = 
+                    -2 * (dfx - lambda * dgx) * dgx +
+                    -2 * (dfy - lambda * dgy) * dgy;
+                
+                // Update parameters
+                x -= learningRate * dL_dx;
+                y -= learningRate * dL_dy;
+                lambda -= learningRate * dL_dlambda;
+            }
+            
+            // Verify the solution
+            const [dfx, dfy] = f.grad(x, y);
+            const [dgx, dgy] = g.grad(x, y);
+            const gVal = g.func(x, y);
+            
+            const gradCondition = Math.sqrt(
+                Math.pow(dfx - lambda*dgx, 2) + 
+                Math.pow(dfy - lambda*dgy, 2)
+            );
+            
+            if (gradCondition > 0.01 || Math.abs(gVal) > 0.01) {
+                return null;
+            }
+            
+            return { 
+                x, 
+                y, 
+                lambda, 
+                fVal: f.func(x, y)
+            };
+        }
+
+        // Function to find multiple solutions
+        function findMultipleSolutions(f, g) {
+            const initialGuesses = [
+                [1, 1], [1, -1], [-1, 1], [-1, -1],
+                [2, 0], [0, 2], [-2, 0], [0, -2],
+                [0.5, 0.5], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5],
+                [1.5, 0], [0, 1.5], [-1.5, 0], [0, -1.5],
+                [0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]
+            ];
+            
+            const solutions = [];
+            const seen = new Set();
+            const precision = 3; // Lower precision to group nearby solutions
+            
+            for (const guess of initialGuesses) {
+                const sol = solveLagrange(f, g, guess);
+                
+                if (sol) {
+                    // Create a key with rounded values
+                    const key = `${Math.round(sol.x * 100)/100},${Math.round(sol.y * 100)/100}`;
+                    
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        
+                        // Classify the critical point
+                        const classification = classifyCriticalPoint(f, g, sol);
+                        
+                        solutions.push({
+                            ...sol,
+                            ...classification
+                        });
+                    }
+                }
+            }
+            
+            // Sort by fVal to find the minimum
+            solutions.sort((a, b) => a.fVal - b.fVal);
+            
+            return solutions;
+        }
+
+        // Update the visualization
+        function updateVisualization(f, g, solutions) {
+            // Generate contour data
+            const gridData = generateGridData(f.func);
+            
+            // Generate constraint data
+            const constraintData = generateConstraintData(g.func);
+            
+            // Prepare traces
+            const traces = [
+                {
+                    x: gridData.x,
+                    y: gridData.y[0],
+                    z: gridData.z,
+                    type: 'contour',
+                    colorscale: 'Viridis',
+                    name: 'f(x,y)',
+                    contours: {
+                        coloring: 'heatmap'
+                    },
+                    hoverinfo: 'none'
+                },
+                {
+                    x: constraintData.x,
+                    y: constraintData.y,
+                    mode: 'lines',
+                    line: {
+                        color: 'black',
+                        width: 3
+                    },
+                    name: 'g(x,y) = 0',
+                    hoverinfo: 'none'
+                }
+            ];
+            
+            // Add solution points with color coding
+            if (solutions.length > 0) {
+                // Separate solutions by type for coloring
+                const minima = solutions.filter(sol => sol.typeClass === "minima");
+                const maxima = solutions.filter(sol => sol.typeClass === "maxima");
+                const saddle = solutions.filter(sol => sol.typeClass === "saddle");
+                
+                if (minima.length > 0) {
+                    traces.push({
+                        x: minima.map(sol => sol.x),
+                        y: minima.map(sol => sol.y),
+                        mode: 'markers',
+                        marker: {
+                            color: '#2ecc71',
+                            size: 12,
+                            symbol: 'circle'
+                        },
+                        name: 'Local minima',
+                        text: minima.map((sol, i) => 
+                            `Minima ${i+1}<br>` +
+                            `x = ${sol.x.toFixed(4)}, y = ${sol.y.toFixed(4)}<br>` +
+                            `f(x,y) = ${sol.fVal.toFixed(4)}<br>` +
+                            `λ = ${sol.lambda.toFixed(4)}`
+                        ),
+                        hoverinfo: 'text'
+                    });
+                }
+                
+                if (maxima.length > 0) {
+                    traces.push({
+                        x: maxima.map(sol => sol.x),
+                        y: maxima.map(sol => sol.y),
+                        mode: 'markers',
+                        marker: {
+                            color: '#e74c3c',
+                            size: 12,
+                            symbol: 'circle'
+                        },
+                        name: 'Local maxima',
+                        text: maxima.map((sol, i) => 
+                            `Maxima ${i+1}<br>` +
+                            `x = ${sol.x.toFixed(4)}, y = ${sol.y.toFixed(4)}<br>` +
+                            `f(x,y) = ${sol.fVal.toFixed(4)}<br>` +
+                            `λ = ${sol.lambda.toFixed(4)}`
+                        ),
+                        hoverinfo: 'text'
+                    });
+                }
+                
+                if (saddle.length > 0) {
+                    traces.push({
+                        x: saddle.map(sol => sol.x),
+                        y: saddle.map(sol => sol.y),
+                        mode: 'markers',
+                        marker: {
+                            color: '#f39c12',
+                            size: 12,
+                            symbol: 'circle'
+                        },
+                        name: 'Saddle points',
+                        text: saddle.map((sol, i) => 
+                            `Saddle ${i+1}<br>` +
+                            `x = ${sol.x.toFixed(4)}, y = ${sol.y.toFixed(4)}<br>` +
+                            `f(x,y) = ${sol.fVal.toFixed(4)}<br>` +
+                            `λ = ${sol.lambda.toFixed(4)}`
+                        ),
+                        hoverinfo: 'text'
+                    });
+                }
+            }
+            
+            // Update plot
+            Plotly.newPlot('contour-plot', traces, {
+                title: `Minimizing ${f.name} subject to ${g.name}`,
+                xaxis: { title: 'x', range: [-3, 3] },
+                yaxis: { title: 'y', range: [-3, 3] },
+                width: 500,
+                height: 500,
+                margin: { t: 40 },
+                showlegend: false
+            });
+        }
+
+        // Update results display with MathJax
+        function updateResults(f, g, solutions) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (solutions.length === 0) {
+                resultsDiv.innerHTML = `
+                    <h2>Results</h2>
+                    <p>No valid solutions found for the selected functions.</p>
+                    <p>This could be because:</p>
+                    <ul>
+                        <li>The solver didn't converge</li>
+                        <li>No critical points exist under the given constraint</li>
+                        <li>Try selecting different functions</li>
+                    </ul>
+                `;
+                return;
+            }
+            
+            let resultsHTML = `
+                <h2>Results for Minimizing \( ${f.name} \) Subject to \( ${g.name} \)</h2>
+                <p>Found ${solutions.length} critical point${solutions.length > 1 ? 's' : ''}:</p>
+            `;
+            
+            solutions.forEach((sol, index) => {
+                const classMap = {
+                    "minima": "minima",
+                    "maxima": "maxima",
+                    "saddle": "saddle"
+                };
+                
+                const typeClass = classMap[sol.typeClass] || "saddle";
+                
+                resultsHTML += `
+                <div class="solution ${typeClass}">
+                    <h3>Critical Point ${index+1}</h3>
+                    <div class="point-info">
+                        <div class="point-details">
+                            <p><strong>Location:</strong> \( (x, y) = (${sol.x.toFixed(4)}, ${sol.y.toFixed(4)}) \)</p>
+                            <p><strong>Function value:</strong> \( f(x,y) = ${sol.fVal.toFixed(4)} \)</p>
+                            <p><strong>Lagrange multiplier:</strong> \( \lambda = ${sol.lambda.toFixed(4)} \)</p>
+                            <p><strong>Classification:</strong> 
+                                <span class="classification ${typeClass}-bg">${sol.classification}</span>
+                            </p>
+                            <p><strong>Hessian Determinants:</strong></p>
+                            <p>First minor: \( H_{11} = ${sol.det1.toFixed(6)} \)</p>
+                            <p>Full determinant: \( |H| = ${sol.det2.toFixed(6)} \)</p>
+                        </div>
+                        <div class="hessian-matrix">
+                            <p>Hessian Matrix:</p>
+                            <div class="matrix">
+                                <table>
+                                    <tr>
+                                        <td>${sol.Lxx.toFixed(4)}</td>
+                                        <td>${sol.Lxy.toFixed(4)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>${sol.Lxy.toFixed(4)}</td>
+                                        <td>${sol.Lyy.toFixed(4)}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <p><strong>Verification:</strong></p>
+                        <p>Gradient condition: \( \nabla f = \lambda \nabla g \)</p>
+                        <p>\( \nabla f = \begin{pmatrix} ${f.grad(sol.x, sol.y)[0].toFixed(4)} \\ ${f.grad(sol.x, sol.y)[1].toFixed(4)} \end{pmatrix} \)</p>
+                        <p>\( \lambda \nabla g = \begin{pmatrix} ${(g.grad(sol.x, sol.y)[0] * sol.lambda).toFixed(4)} \\ ${(g.grad(sol.x, sol.y)[1] * sol.lambda).toFixed(4)} \end{pmatrix} \)</p>
+                        <p>Constraint satisfied: \( g(x,y) = ${g.func(sol.x, sol.y).toFixed(6)} \)</p>
+                    </div>
+                </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = resultsHTML;
+            
+            // Render MathJax
+            if (window.MathJax) {
+                MathJax.typeset();
+            }
+        }
+
+        // Event listener for the calculate button
+        document.getElementById('calculate-btn').addEventListener('click', function() {
+            const fIndex = parseInt(document.getElementById('f-select').value);
+            const gIndex = parseInt(document.getElementById('g-select').value);
+            
+            const f = functions[fIndex];
+            const g = constraints[gIndex];
+            
+            const solutions = findMultipleSolutions(f, g);
+            
+            updateVisualization(f, g, solutions);
+            updateResults(f, g, solutions);
+        });
+
+        // Initialize with default selection
+        document.getElementById('calculate-btn').click();
+    </script>
+</body>
+</html>
