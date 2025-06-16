@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Share of German and Chinese Car Manufacturers in China (2005-2024)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+        table {
+            width: 50%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .chart-container {
+            width: 80%;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .pie-chart-container {
+            width: 300px; /* Smaller size for pie chart */
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .slider-container {
+            text-align: center;
+            margin: 20px auto;
+        }
+        #speedSlider {
+            width: 300px;
+        }
+        #speedValue {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        #currentYear {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        #pieChart {
+            max-width: 300px; /* Ensure canvas is constrained */
+            max-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Market Share of German and Chinese Car Manufacturers in China (2005-2024)</h1>
+
+    <!-- Table of Relative Frequencies -->
+    <h2>Table of Relative Frequencies (%)</h2>
+    <table>
+        <tr>
+            <th>Year</th>
+            <th>German Manufacturers</th>
+            <th>Chinese Manufacturers</th>
+            <th>Others</th>
+        </tr>
+        <tr><td>2005</td><td>20.0</td><td>25.0</td><td>55.0</td></tr>
+        <tr><td>2006</td><td>20.5</td><td>26.0</td><td>53.5</td></tr>
+        <tr><td>2007</td><td>21.0</td><td>27.0</td><td>52.0</td></tr>
+        <tr><td>2008</td><td>20.5</td><td>28.0</td><td>51.5</td></tr>
+        <tr><td>2009</td><td>19.25</td><td>29.67</td><td>51.08</td></tr>
+        <tr><td>2010</td><td>22.0</td><td>30.0</td><td>48.0</td></tr>
+        <tr><td>2011</td><td>22.5</td><td>30.5</td><td>47.0</td></tr>
+        <tr><td>2012</td><td>23.0</td><td>31.0</td><td>46.0</td></tr>
+        <tr><td>2013</td><td>23.5</td><td>31.5</td><td>45.0</td></tr>
+        <tr><td>2014</td><td>24.0</td><td>32.0</td><td>44.0</td></tr>
+        <tr><td>2015</td><td>24.0</td><td>33.0</td><td>43.0</td></tr>
+        <tr><td>2016</td><td>24.0</td><td>34.0</td><td>42.0</td></tr>
+        <tr><td>2017</td><td>24.0</td><td>35.0</td><td>41.0</td></tr>
+        <tr><td>2018</td><td>24.0</td><td>35.0</td><td>41.0</td></tr>
+        <tr><td>2019</td><td>23.0</td><td>37.0</td><td>40.0</td></tr>
+        <tr><td>2020</td><td>24.0</td><td>38.0</td><td>38.0</td></tr>
+        <tr><td>2021</td><td>22.0</td><td>40.0</td><td>38.0</td></tr>
+        <tr><td>2022</td><td>20.0</td><td>43.0</td><td>37.0</td></tr>
+        <tr><td>2023</td><td>17.0</td><td>47.0</td><td>36.0</td></tr>
+        <tr><td>2024</td><td>15.0</td><td>52.0</td><td>33.0</td></tr>
+    </table>
+
+    <!-- Bar Plot -->
+    <h2>Bar Plot of Market Shares</h2>
+    <div class="chart-container">
+        <canvas id="barChart"></canvas>
+    </div>
+
+    <!-- Animated Pie Chart -->
+    <h2>Animated Pie Chart of Market Shares (2005-2024)</h2>
+    <div class="slider-container">
+        <label for="speedSlider">Animation Speed (ms per year):</label>
+        <input type="range" id="speedSlider" min="100" max="2000" value="1000" step="100">
+        <span id="speedValue">1000 ms</span>
+    </div>
+    <div class="pie-chart-container">
+        <canvas id="pieChart"></canvas>
+        <div style="text-align: center; margin-top: 10px;">
+            <span>Current Year: </span><span id="currentYear">2005</span>
+        </div>
+    </div>
+
+    <script>
+        // Market share data for animation
+        const marketData = [
+            { year: 2005, german: 20.0, chinese: 25.0, others: 55.0 },
+            { year: 2006, german: 20.5, chinese: 26.0, others: 53.5 },
+            { year: 2007, german: 21.0, chinese: 27.0, others: 52.0 },
+            { year: 2008, german: 20.5, chinese: 28.0, others: 51.5 },
+            { year: 2009, german: 19.25, chinese: 29.67, others: 51.08 },
+            { year: 2010, german: 22.0, chinese: 30.0, others: 48.0 },
+            { year: 2011, german: 22.5, chinese: 30.5, others: 47.0 },
+            { year: 2012, german: 23.0, chinese: 31.0, others: 46.0 },
+            { year: 2013, german: 23.5, chinese: 31.5, others: 45.0 },
+            { year: 2014, german: 24.0, chinese: 32.0, others: 44.0 },
+            { year: 2005, german: 24.0, chinese: 33.0, others: 43.0 },
+            { year: 2016, german: 24.0, chinese: 34.0, others: 42.0 },
+            { year: 2017, german: 24.0, chinese: 35.0, others: 41.0 },
+            { year: 2018, german: 24.0, chinese: 35.0, others: 41.0 },
+            { year: 2019, german: 23.0, chinese: 37.0, others: 40.0 },
+            { year: 2020, german: 24.0, chinese: 38.0, others: 38.0 },
+            { year: 2021, german: 22.0, chinese: 40.0, others: 38.0 },
+            { year: 2022, german: 20.0, chinese: 43.0, others: 37.0 },
+            { year: 2023, german: 17.0, chinese: 47.0, others: 36.0 },
+            { year: 2024, german: 15.0, chinese: 52.0, others: 33.0 }
+        ];
+
+        // Bar Plot
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: marketData.map(data => data.year),
+                datasets: [
+                    {
+                        label: 'German Manufacturers',
+                        data: marketData.map(data => data.german),
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Chinese Manufacturers',
+                        data: marketData.map(data => data.chinese),
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Market Share (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Market Share of German vs. Chinese Car Manufacturers (2005-2024)'
+                    }
+                }
+            }
+        });
+
+        // Animated Pie Chart
+        const ctxPie = document.getElementById('pieChart').getContext('2d');
+        let pieChart = new Chart(ctxPie, {
+            type: 'pie',
+            data: {
+                labels: ['German Manufacturers', 'Chinese Manufacturers', 'Others'],
+                datasets: [{
+                    data: [marketData[0].german, marketData[0].chinese, marketData[0].others],
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(200, 200, 200, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(200, 200, 200, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    title: {
+                        display: true,
+                        text: `Market Share in Chinese Car Market (2005)`,
+                        font: {
+                            size: 24 // Larger font size for title
+                        }
+                    }
+                }
+            }
+        });
+
+        // Animation Logic
+        let currentIndex = 0;
+        let animationInterval;
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const currentYearDisplay = document.getElementById('currentYear');
+
+        function updatePieChart() {
+            const data = marketData[currentIndex];
+            pieChart.data.datasets[0].data = [data.german, data.chinese, data.others];
+            pieChart.options.plugins.title.text = `Market Share in Chinese Car Market (${data.year})`;
+            currentYearDisplay.textContent = data.year;
+            pieChart.update();
+            currentIndex = (currentIndex + 1) % marketData.length; // Loop back to start
+        }
+
+        function startAnimation(speed) {
+            if (animationInterval) clearInterval(animationInterval);
+            animationInterval = setInterval(updatePieChart, speed);
+        }
+
+        // Initialize animation with default speed
+        startAnimation(speedSlider.value);
+
+        // Update animation speed on slider change
+        speedSlider.addEventListener('input', () => {
+            const speed = parseInt(speedSlider.value);
+            speedValue.textContent = `${speed} ms`;
+            startAnimation(speed);
+        });
+    </script>
+</body>
+</html>
