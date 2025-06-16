@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Integral Volume Visualization</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        #plot {
+            width: 100%;
+            height: 600px;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        label {
+            margin-right: 10px;
+        }
+        input, select {
+            padding: 5px;
+            margin: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Double Integral Volume Visualization</h1>
+        <div class="input-group">
+            <label for="functionSelect">Select Function f(x, y):</label>
+            <select id="functionSelect">
+                <option value="0">x² + y²</option>
+                <option value="1">sin(x) * cos(y)</option>
+                <option value="2">x * y</option>
+                <option value="3">e^(x + y)</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>x_min:</label><input type="number" id="xMin" value="0" step="0.1">
+            <label>x_max:</label><input type="number" id="xMax" value="2" step="0.1">
+        </div>
+        <div class="input-group">
+            <label>y_min:</label><input type="number" id="yMin" value="0" step="0.1">
+            <label>y_max:</label><input type="number" id="yMax" value="2" step="0.1">
+        </div>
+        <div class="input-group">
+            <label>Subdivisions (per axis):</label><input type="number" id="subdivisions" value="50" min="10" max="100">
+        </div>
+        <button onclick="computeAndPlot()">Compute and Visualize</button>
+        <p id="result">Integral Result: </p>
+        <div id="plot"></div>
+    </div>
+
+    <script>
+        // Define example functions
+        const functions = [
+            (x, y) => x * x + y * y,           // x² + y²
+            (x, y) => Math.sin(x) * Math.cos(y), // sin(x) * cos(y)
+            (x, y) => x * y,                   // x * y
+            (x, y) => Math.exp(x + y)          // e^(x + y)
+        ];
+
+        // Function to compute the double integral using midpoint Riemann sum
+        function computeIntegral(f, xMin, xMax, yMin, yMax, n) {
+            const dx = (xMax - xMin) / n;
+            const dy = (yMax - yMin) / n;
+            let sum = 0;
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    const x = xMin + (i + 0.5) * dx;
+                    const y = yMin + (j + 0.5) * dy;
+                    sum += f(x, y) * dx * dy;
+                }
+            }
+            return sum;
+        }
+
+        // Function to generate plot data
+        function generatePlotData(f, xMin, xMax, yMin, yMax) {
+            // Extend plot domain beyond integration bounds
+            const xRange = xMax - xMin;
+            const yRange = yMax - yMin;
+            const plotXMin = xMin - Math.max(0.5 * xRange, 1);
+            const plotXMax = xMax + Math.max(0.5 * xRange, 1);
+            const plotYMin = yMin - Math.max(0.5 * yRange, 1);
+            const plotYMax = yMax + Math.max(0.5 * yRange, 1);
+
+            // Grid for the main surface
+            const n = 50; // Grid points for plotting
+            const x = Array.from({ length: n }, (_, i) => plotXMin + (plotXMax - plotXMin) * i / (n - 1));
+            const y = Array.from({ length: n }, (_, i) => plotYMin + (plotYMax - plotYMin) * i / (n - 1));
+            const z = x.map(xi => y.map(yj => f(xi, yj)));
+
+            // Main surface plot
+            const surface = {
+                x: x,
+                y: y,
+                z: z,
+                type: 'surface',
+                colorscale: 'Viridis',
+                opacity: 0.7,
+                showscale: true,
+                name: 'f(x, y)'
+            };
+
+            // Grid for the volume (integration region)
+            const nInt = 20; // Grid points for integration region
+            const xInt = Array.from({ length: nInt }, (_, i) => xMin + (xMax - xMin) * i / (nInt - 1));
+            const yInt = Array.from({ length: nInt }, (_, i) => yMin + (yMax - yMin) * i / (nInt - 1));
+            const zInt = xInt.map(xi => yInt.map(yj => f(xi, yj)));
+
+            // Volume top surface
+            const volumeTop = {
+                x: xInt,
+                y: yInt,
+                z: zInt,
+                type: 'surface',
+                colorscale: [[0, 'rgba(0, 0, 255, 0.4)'], [1, 'rgba(0, 0, 255, 0.4)']],
+                opacity: 0.4,
+                showscale: false,
+                name: 'Volume (Top)'
+            };
+
+            // Volume bottom surface (at z=0)
+            const volumeBottom = {
+                x: xInt,
+                y: yInt,
+                z: xInt.map(() => yInt.map(() => 0)),
+                type: 'surface',
+                colorscale: [[0, 'rgba(0, 0, 255, 0.4)'], [1, 'rgba(0, 0, 255, 0.4)']],
+                opacity: 0.4,
+                showscale: false,
+                name: 'Volume (Bottom)'
+            };
+
+            // Sidewalls for the volume
+            // Side 1: x = xMin, y in [yMin, yMax], z in [0, f(xMin, y)]
+            const xSide1 = Array(nInt).fill(xMin);
+            const ySide1 = yInt;
+            const zSide1 = yInt.map(yi => [0, f(xMin, yi)]);
+            const side1 = {
+                x: xSide1,
+                y: ySide1,
+                z: zSide1,
+                type: 'surface',
+                colorscale: [[0, 'rgba(0, 0, 255, 0.4)'], [1, 'rgba(0, 0, 255, 0.4)']],
+                opacity: 0.4,
+                showscale: false,
+                name: 'Volume (Side)'
+            };
+
+            // Side 2: x = xMax, y in [yMin, yMax], z in [0, f(xMax, y)]
+            const xSide2 = Array(nInt).fill(xMax);
+            const ySide2 = yInt;
+            const zSide2 = yInt.map(yi => [0, f(xMax, yi)]);
+            const side2 = {
+                x: xSide2,
+                y: ySide2,
+                z: zSide2,
+                type: 'surface',
+                colorscale: [[0, 'rgba(0, 0, 255, 0.4)'], [1, 'rgba(0, 0, 255, 0.4)']],
+                opacity: 0.4,
+                showscale: false,
+                name: 'Volume (Side)'
+            };
+
+            // Side 3: y = yMin, x in [xMin, xMax], z in [0, f(x, yMin)]
+            const xSide3 = xInt;
+            const ySide3 = Array(nInt).fill(yMin);
+            const zSide3 = xInt.map(xi => [0, f(xi, yMin)]);
+            const side3 = {
+                x: xSide3,
+                y: ySide3,
+                z: zSide3,
+                type: 'surface',
+                colorscale: [[0, 'rgba(0, 0, 255, 0.4)'], [1, 'rgba(0, 0, 255, 0.4)']],
+                opacity: 0.4,
+                showscale: false,
+                name: 'Volume (Side)'
+            };
+
+            // Side 4: y = yMax, x in [xMin, xMax], z in [0, f(x, yMax)]
+            const xSide4 = xInt;
+            const ySide4 = Array(nInt).fill(yMax);
+            const zSide4 = xInt.map(xi => [0, f(xi, yMax)]);
+            const side4 = {
+                x: xSide4,
+                y: ySide4,
+                z: zSide4,
+                type: 'surface',
+                colorscale: [[0, 'rgba(0, 0, 255, 0.4)'], [1, 'rgba(0, 0, 255, 0.4)']],
+                opacity: 0.4,
+                showscale: false,
+                name: 'Volume (Side)'
+            };
+
+            // Integration region boundary on the surface
+            const xRect = [xMin, xMax, xMax, xMin, xMin];
+            const yRect = [yMin, yMin, yMax, yMax, yMin];
+            const zRect = xRect.map((xi, i) => f(xi, yRect[i]));
+            const boundary = {
+                x: xRect,
+                y: yRect,
+                z: zRect,
+                type: 'scatter3d',
+                mode: 'lines',
+                line: { color: 'black', width: 6, dash: 'dash' },
+                name: 'Integration Boundary'
+            };
+
+            return [surface, volumeTop, volumeBottom, side1, side2, side3, side4, boundary];
+        }
+
+        // Main function to compute integral and update plot
+        function computeAndPlot() {
+            // Get input values
+            const funcIndex = parseInt(document.getElementById('functionSelect').value);
+            const xMin = parseFloat(document.getElementById('xMin').value);
+            const xMax = parseFloat(document.getElementById('xMax').value);
+            const yMin = parseFloat(document.getElementById('yMin').value);
+            const yMax = parseFloat(document.getElementById('yMax').value);
+            const subdivisions = parseInt(document.getElementById('subdivisions').value);
+
+            // Validate inputs
+            if (isNaN(xMin) || isNaN(xMax) || isNaN(yMin) || isNaN(yMax) || xMin >= xMax || yMin >= yMax) {
+                alert('Please ensure x_min < x_max and y_min < y_max');
+                return;
+            }
+            if (subdivisions < 10 || subdivisions > 100) {
+                alert('Subdivisions must be between 10 and 100');
+                return;
+            }
+
+            const f = functions[funcIndex];
+
+            // Compute integral
+            const integral = computeIntegral(f, xMin, xMax, yMin, yMax, subdivisions);
+            document.getElementById('result').textContent = `Integral Result: ${integral.toFixed(6)}`;
+
+            // Generate plot
+            const data = generatePlotData(f, xMin, xMax, yMin, yMax);
+            const layout = {
+                title: `f(x, y) = ${document.getElementById('functionSelect').options[funcIndex].text}`,
+                scene: {
+                    xaxis: { title: 'x' },
+                    yaxis: { title: 'y' },
+                    zaxis: { title: 'f(x, y)' }
+                },
+                margin: { l: 0, r: 0, b: 0, t: 50 },
+                showlegend: true
+            };
+
+            Plotly.newPlot('plot', data, layout);
+        }
+
+        // Initial plot on page load
+        computeAndPlot();
+    </script>
+</body>
+</html>
