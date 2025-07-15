@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inequality Measures Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .chart-container {
+            flex: 1;
+            min-width: 400px;
+            height: 400px;
+        }
+        .controls {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        select, button, input {
+            padding: 8px 12px;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .formula {
+            background: #f0f8ff;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .index-display {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background: #e8f4f8;
+            border-radius: 5px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: #f2f2f2;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+            font-size: 17px;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .tabcontent {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            animation: fadeEffect 1s;
+        }
+        .custom-data-input {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+        .custom-data-input h3 {
+            margin-top: 0;
+        }
+        .value-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .value-input {
+            display: flex;
+            align-items: center;
+        }
+        .value-input input {
+            width: 60px;
+        }
+        .add-remove-buttons {
+            margin-top: 10px;
+        }
+        .interpretation {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        @keyframes fadeEffect {
+            from {opacity: 0;}
+            to {opacity: 1;}
+        }
+    </style>
+</head>
+<body>
+    <h1>Inequality Measures Visualization</h1>
+    
+    <div class="controls">
+        <label for="dataset">Select Dataset:</label>
+        <select id="dataset">
+            <option value="perfectEquality">Perfect Equality</option>
+            <option value="uniform">Some Distribution</option>
+            <option value="pareto">Pareto Distribution (80-20)</option>
+            <option value="usIncome">US Income Quintiles (2020)</option>
+            <option value="marketShares">Market Shares (5 firms)</option>
+            <option value="custom">Custom Data</option>
+        </select>
+        <button id="updateBtn">Update Visualization</button>
+    </div>
+    
+    <div id="customDataInput" class="custom-data-input" style="display: none;">
+        <h3>Custom Data Input</h3>
+        <div>
+            <label>Data Type:</label>
+            <select id="customDataType">
+                <option value="income">Income Distribution</option>
+                <option value="market">Market Shares</option>
+            </select>
+        </div>
+        <div class="value-inputs" id="customValueInputs">
+            <!-- Value inputs will be added here dynamically -->
+        </div>
+        <div class="add-remove-buttons">
+            <button id="addValueBtn">Add Value</button>
+            <button id="removeValueBtn">Remove Value</button>
+        </div>
+        <button id="applyCustomDataBtn">Apply Custom Data</button>
+    </div>
+    
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'lorenz')">Lorenz Curve & Gini</button>
+        <button class="tablinks" onclick="openTab(event, 'herfindahl')">Herfindahl Index</button>
+        <button class="tablinks" onclick="openTab(event, 'formulas')">Formulas</button>
+    </div>
+    
+    <div id="lorenz" class="tabcontent" style="display: block;">
+        <div class="container">
+            <div class="chart-container">
+                <canvas id="lorenzChart"></canvas>
+            </div>
+            <div>
+                <h2>Lorenz Curve and Gini Index</h2>
+                <p>The Lorenz curve is a graphical representation of the distribution of income or wealth. It plots the cumulative percentage of total income received against the cumulative percentage of recipients.</p>
+                <p>The line at 45 degrees represents perfect equality of incomes. The Gini index is twice the area between the line of equality and the Lorenz curve.</p>
+                
+                <div class="index-display">
+                    Gini Index: <span id="giniValue">0</span>
+                </div>
+                
+                <h3>Data Table</h3>
+                <table class="data-table" id="lorenzDataTable">
+                    <thead>
+                        <tr>
+                            <th>Group</th>
+                            <th>Population %</th>
+                            <th>Income %</th>
+                            <th>Cumulative Population %</th>
+                            <th>Cumulative Income %</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div id="herfindahl" class="tabcontent">
+        <div>
+            <h2>Herfindahl-Hirschman Index (HHI)</h2>
+            <p>The Herfindahl index is a measure of market concentration calculated by summing the squares of the market shares of all firms in the industry.</p>
+            
+            <div class="index-display">
+                Herfindahl Index: <span id="herfindahlValue">0</span>
+            </div>
+            
+            <h3>Detailed Calculation</h3>
+            <table class="data-table" id="herfindahlDataTable">
+                <thead>
+                    <tr>
+                        <th>Firm</th>
+                        <th>Market Share (s<sub>i</sub>)</th>
+                        <th>Squared Share (s<sub>i</sub><sup>2</sup>)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                    <tr>
+                        <th>Total (HHI)</th>
+                        <th></th>
+                        <th id="hhiTotal">0</th>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div class="interpretation">
+                <h4>Interpretation Guidelines:</h4>
+                <ul>
+                    <li>Below 1,500: Competitive market</li>
+                    <li>1,500-2,500: Moderately concentrated</li>
+                    <li>Above 2,500: Highly concentrated</li>
+                </ul>
+                <p>Note: HHI ranges from 0 to 10,000 when using percentage values (0-100).</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="formulas" class="tabcontent">
+        <h2>Formulas Explained</h2>
+        
+        <h3>Gini Index</h3>
+        <div class="formula">
+            \[ G = 2 \times \text{Area between Lorenz curve and line of equality} \]
+            <p>With discrete data, the Gini coefficient can be calculated as:</p>
+            \[ G = 1 - \frac{1}{n} \sum_{i=1}^{n} (x_i - x_{i-1})(y_i + y_{i-1}) \]
+            Where:
+            <ul>
+                <li>\( x_i \) is the cumulative proportion of the population (sorted by income)</li>
+                <li>\( y_i \) is the cumulative proportion of income</li>
+                <li>\( n \) is the number of observations</li>
+            </ul>
+        </div>
+        
+        <h3>Herfindahl-Hirschman Index</h3>
+        <div class="formula">
+            \[ HHI = \sum_{i=1}^{N} s_i^2 \]
+            Where:
+            <ul>
+                <li>\( s_i \) is the market share of firm \( i \) (as percentage 0-100)</li>
+                <li>\( N \) is the number of firms</li>
+            </ul>
+            <p>When using decimal values (0-1), multiply the result by 10,000.</p>
+        </div>
+    </div>
+
+    <script>
+        // Datasets
+        const datasets = {
+            perfectEquality: {
+                name: "Perfect Equality",
+                type: "income",
+                values: [20, 20, 20, 20, 20]
+            },
+            uniform: {
+                name: "Some Distribution",
+                type: "income",
+                values: [10, 15, 20, 25, 30]
+            },
+            pareto: {
+                name: "Pareto Distribution (80-20)",
+                type: "income",
+                values: [5, 10, 15, 20, 50]
+            },
+            usIncome: {
+                name: "US Income Quintiles (2020)",
+                type: "income",
+                values: [3.1, 8.2, 14.3, 23.0, 51.4]
+            },
+            marketShares: {
+                name: "Market Shares (5 firms)",
+                type: "market",
+                values: [40, 30, 15, 10, 5]
+            },
+            custom: {
+                name: "Custom Data",
+                type: "both",
+                values: [25, 25, 25, 25]
+            }
+        };
+
+        // Chart instance
+        let lorenzChart;
+        let customValues = [25, 25, 25, 25];
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            setupCharts();
+            setupCustomDataInput();
+            document.getElementById('dataset').addEventListener('change', handleDatasetChange);
+            document.getElementById('updateBtn').addEventListener('click', updateVisualization);
+            updateVisualization();
+        });
+
+        function setupCharts() {
+            const lorenzCtx = document.getElementById('lorenzChart').getContext('2d');
+            
+            lorenzChart = new Chart(lorenzCtx, {
+                type: 'line',
+                data: { 
+                    datasets: [
+                        {
+                            label: 'Line of Equality',
+                            data: [{x: 0, y: 0}, {x: 100, y: 100}],
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(0, 0, 0, 0)',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Lorenz Curve',
+                            data: [],
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.1
+                        }
+                    ] 
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: {
+                                display: true,
+                                text: 'Cumulative Population %'
+                            },
+                            min: 0,
+                            max: 100
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Cumulative Income %'
+                            },
+                            min: 0,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Lorenz Curve'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Cumulative Income: ${context.parsed.y.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function setupCustomDataInput() {
+            const datasetSelect = document.getElementById('dataset');
+            const customDataInput = document.getElementById('customDataInput');
+            const addValueBtn = document.getElementById('addValueBtn');
+            const removeValueBtn = document.getElementById('removeValueBtn');
+            const applyCustomDataBtn = document.getElementById('applyCustomDataBtn');
+            const customValueInputs = document.getElementById('customValueInputs');
+            const customDataType = document.getElementById('customDataType');
+            
+            datasetSelect.addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    customDataInput.style.display = 'block';
+                    updateCustomValueInputs();
+                } else {
+                    customDataInput.style.display = 'none';
+                }
+            });
+            
+            addValueBtn.addEventListener('click', function() {
+                customValues.push(10);
+                updateCustomValueInputs();
+            });
+            
+            removeValueBtn.addEventListener('click', function() {
+                if (customValues.length > 1) {
+                    customValues.pop();
+                    updateCustomValueInputs();
+                }
+            });
+            
+            applyCustomDataBtn.addEventListener('click', function() {
+                datasets.custom.values = [...customValues];
+                datasets.custom.type = customDataType.value;
+                updateVisualization();
+            });
+            
+            customDataType.addEventListener('change', function() {
+                updateCustomValueInputs();
+            });
+            
+            updateCustomValueInputs();
+        }
+        
+        function updateCustomValueInputs() {
+            const customValueInputs = document.getElementById('customValueInputs');
+            customValueInputs.innerHTML = '';
+            
+            const dataType = document.getElementById('customDataType').value;
+            const label = dataType === 'income' ? 'Group' : 'Firm';
+            
+            customValues.forEach((value, index) => {
+                const inputDiv = document.createElement('div');
+                inputDiv.className = 'value-input';
+                
+                const labelEl = document.createElement('label');
+                labelEl.textContent = `${label} ${index + 1}:`;
+                labelEl.htmlFor = `value-${index}`;
+                
+                const inputEl = document.createElement('input');
+                inputEl.type = 'number';
+                inputEl.id = `value-${index}`;
+                inputEl.value = value;
+                inputEl.min = 0;
+                inputEl.step = 0.1;
+                
+                inputEl.addEventListener('change', function() {
+                    customValues[index] = parseFloat(this.value) || 0;
+                });
+                
+                inputDiv.appendChild(labelEl);
+                inputDiv.appendChild(inputEl);
+                customValueInputs.appendChild(inputDiv);
+            });
+        }
+
+        function handleDatasetChange() {
+            const datasetName = this.value;
+            if (datasetName !== 'custom') {
+                updateVisualization();
+            }
+        }
+
+        function updateVisualization() {
+            const datasetName = document.getElementById('dataset').value;
+            const dataset = datasets[datasetName];
+            
+//            if (dataset.type === 'income' || dataset.type === 'both') {
+                updateLorenzCurve(dataset.values);
+//            }
+            
+//            if (dataset.type === 'market' || dataset.type === 'both') {
+                updateHerfindahlIndex(dataset.values);
+//            }
+        }
+
+        function updateLorenzCurve(values) {
+            const total = values.reduce((sum, val) => sum + val, 0);
+            const normalized = values.map(val => (val / total) * 100);
+            
+            const cumulativePop = [];
+            const cumulativeIncome = [];
+            let popSum = 0;
+            let incomeSum = 0;
+            
+            const points = [{x: 0, y: 0}];
+            for (let i = 0; i < normalized.length; i++) {
+                popSum += 100 / normalized.length;
+                incomeSum += normalized[i];
+                points.push({x: popSum, y: incomeSum});
+                
+                cumulativePop.push(popSum);
+                cumulativeIncome.push(incomeSum);
+            }
+            
+            let areaBetween = 0;
+            for (let i = 1; i < points.length; i++) {
+                const width = points[i].x - points[i-1].x;
+                const equalityHeight = (points[i].x + points[i-1].x) / 2;
+                const lorenzHeight = (points[i].y + points[i-1].y) / 2;
+                areaBetween += width * (equalityHeight - lorenzHeight);
+            }
+            
+            const giniCoefficient = (2 * areaBetween / 10000).toFixed(3);
+            
+            lorenzChart.data.datasets[1].data = points;
+            lorenzChart.update();
+            
+            document.getElementById('giniValue').textContent = giniCoefficient;
+            
+            const tableBody = document.querySelector('#lorenzDataTable tbody');
+            tableBody.innerHTML = '';
+            
+            for (let i = 0; i < normalized.length; i++) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>Group ${i+1}</td>
+                    <td>${(100 / normalized.length).toFixed(1)}%</td>
+                    <td>${normalized[i].toFixed(1)}%</td>
+                    <td>${cumulativePop[i].toFixed(1)}%</td>
+                    <td>${cumulativeIncome[i].toFixed(1)}%</td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        function updateHerfindahlIndex(values) {
+            // Calculate market shares as percentages
+            const total = values.reduce((sum, val) => sum + val, 0);
+            const shares = values.map(val => (val / total));
+            const squaredShares = shares.map(val => val*val);
+            
+            // Calculate HHI and squared shares
+            let hhi = 0;
+            for (let i = 0; i < shares.length; i++) {
+                hhi += squaredShares[i];
+            }
+            
+            // Update display
+            document.getElementById('herfindahlValue').textContent = hhi.toFixed(2);
+            //document.getElementById('herfindahlValue').textContent = shares.length.toFixed(2);
+            document.getElementById('hhiTotal').textContent = hhi.toFixed(2);
+            
+            // Update table
+            const tableBody = document.querySelector('#herfindahlDataTable tbody');
+            tableBody.innerHTML = '';
+            
+            //shares.forEach((share, i) => {
+            for (let i = 0; i < shares.length; i++) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>Firm ${i+1}</td>
+                    <td>${shares[i].toFixed(2)}%</td>
+                    <td>${squaredShares[i].toFixed(2)}%</td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        function openTab(evt, tabName) {
+            const tabcontent = document.getElementsByClassName("tabcontent");
+            for (let i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            
+            const tablinks = document.getElementsByClassName("tablinks");
+            for (let i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+    </script>
+</body>
+</html>
+
