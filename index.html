@@ -1,40 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
-    <title>3D Geraden mit korrigierter Steuerung</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mathematik für WiWis -- KI-Tools</title>
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; }
-        #container { position: relative; }
-        .controls {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(255,255,255,0.8);
-            padding: 15px;
-            border-radius: 5px;
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+            --card-bg: #ffffff;
         }
-        .input-group { margin: 10px 0; }
-        input { width: 50px; margin: 0 5px; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            color: white;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 { margin: 0; font-size: 2.2rem; }
+        p { opacity: 0.9; }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid #e2e8f0;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+        }
+
+        .card p {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin: 0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
-    <div id="container">
-        <div class="controls">
-            <h3>Richtungsvektoren</h3>
-            <div class="input-group">
-                Gerade 1: 
-                <input type="number" id="dx1" value="1" step="0.1">
-                <input type="number" id="dy1" value="0" step="0.1">
-                <input type="number" id="dz1" value="0" step="0.1">
-            </div>
-            <div class="input-group">
-                Gerade 2: 
-                <input type="number" id="dx2" value="0" step="0.1">
-                <input type="number" id="dy2" value="1" step="0.1">
-                <input type="number" id="dz2" value="0" step="0.1">
-            </div>
-            <button onclick="resetCamera()">Kamera zurücksetzen</button>
-        </div>
+
+<div class="container">
+    <header>
+        <h1>Mathematik für WiWis</h1>
+        <p>Interaktive KI-Tools & Visualisierungen</p>
+    </header>
+
+    <div class="grid">
+        <a href="FuncPlot.html" class="card">
+            <h3>Funktions-Plotter</h3>
+            <p>Visualisierung mathematischer Funktionen.</p>
+        </a>
+        <a href="Continuity.html" class="card">
+            <h3>Stetigkeit</h3>
+            <p>Illustration des Stetigkeitsbegriffs.</p>
+        </a>
+        <a href="integration.html" class="card">
+            <h3>Integration</h3>
+            <p>Berechnung und Visualisierung von Integralen.</p>
+        </a>
+
+        <a href="GaussSolver.html" class="card">
+            <h3>Gauss-Löser</h3>
+            <p>Gauss-Verfahren zur Lösung linearer Gleichungssysteme.</p>
+        </a>
+        <a href="DetCramersRule.html" class="card">
+            <h3>Determinanten & Cramer</h3>
+            <p>Berechnung via Cramerscher Regel.</p>
+        </a>
+        <a href="mat-vector.html" class="card">
+            <h3>Matrix-Vektor-Rechnung</h3>
+            <p>Matrix-Vektor-Operationen der linearen Algebra.</p>
+        </a>
+
+        <a href="Geraden.html" class="card">
+            <h3>Geraden</h3>
+            <p>Visualisierung von Vektoren und Geraden.</p>
+        </a>
+        <a href="gerade-ebene.html" class="card">
+            <h3>Gerade & Ebene</h3>
+            <p>Lagebeziehungen im dreidimensionalen Raum.</p>
+        </a>
+
+        <a href="GradHessian.html" class="card">
+            <h3>Gradient & Hesse</h3>
+            <p>Ableitungen höherer Ordnung und Analysen.</p>
+        </a>
+        <a href="gradientdescend.html" class="card">
+            <h3>Gradientenverfahren</h3>
+            <p>Visualisierung des Gradientenabstiegsverfahren.</p>
+        </a>
+        <a href="OptimConstraint.html" class="card">
+            <h3>Optimierung mit Nebenbedingungen</h3>
+            <p>Lagrange-Verfahren und mehr.</p>
+        </a>
+
+        <a href="Solver-V3.html" class="card">
+            <h3>Universal-Solver V3</h3>
+            <p>Lösung linearer Gleichungssysteme (allgemeiner Fall).</p>
+        </a>
+        <a href="neighborhoods.html" class="card">
+            <h3>Umgebungen</h3>
+            <p>Veranschaulichung der Umgebung eines Punktes.</p>
+        </a>
+        <a href="concentration.html" class="card">
+            <h3>Konzentration</h3>
+            <p>Statistische Konzentrationsmaße.</p>
+        </a>
+        <a href="chinese-car-market.html" class="card">
+            <h3>Automarkt China</h3>
+            <p>Fallbeispiel: Datenanalyse und Marktentwicklung.</p>
+        </a>
+    </div>
+
+    <div class="footer">
+        &copy; 2026 Mathematik für WiWis Repository
+    </div>
+</div>
+
+</body>
+</html>        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
